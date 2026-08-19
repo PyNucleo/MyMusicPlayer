@@ -31,7 +31,7 @@ android {
         vectorDrawables.useSupportLibrary = true
 
         buildConfigField("String", "GIT_COMMIT", "\"${gitCommit()}\"")
-        buildConfigField("String", "NEWPIPE_VERSION", "\"0.26.2\"")
+        buildConfigField("String", "NEWPIPE_VERSION", "\"0.26.5\"")
         buildConfigField("String", "MEDIA3_VERSION", "\"1.10.1\"")
         buildConfigField("int", "DATABASE_VERSION", "1")
     }
@@ -134,7 +134,7 @@ dependencies {
     implementation("androidx.media3:media3-datasource-okhttp:1.10.1")
     implementation("com.squareup.okhttp3:okhttp:5.2.1")
 
-    implementation("com.github.TeamNewPipe:NewPipeExtractor:v0.26.2")
+    implementation("com.github.TeamNewPipe:NewPipeExtractor:v0.26.5")
     implementation("com.google.code.gson:gson:2.14.0")
     implementation("io.coil-kt.coil3:coil-compose:3.5.0")
     implementation("io.coil-kt.coil3:coil-network-okhttp:3.5.0")

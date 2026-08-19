@@ -25,7 +25,7 @@ Recorded 2026-08-19. A checked item has direct local evidence. Device/source/sig
 
 - [x] Guarded canary command exists and is separate from deterministic tests.
 - [x] Public search metadata succeeded during the 2026-08-19 canary.
-- [ ] Normal intended public content resolves to a transient playable audio stream. Current failure: NewPipe Extractor v0.26.2 returns no audio-only URL streams.
+- [x] Normal intended public content resolves to a transient audio URL in the guarded host canary after the official NewPipe Extractor `v0.26.5` update; successful target-device playback still requires retest.
 - [ ] Real target-device search, watch/share URL, pagination, Play, Play Next, Queue, Add to Playlist, and public playlist import pass.
 - [x] DRM/authentication/bot/access-control/age/region/private/paid/anti-copying hard-stop behavior is explicit; no bypass is implemented.
 
@@ -37,7 +37,7 @@ Scope: user-reported manual smoke test of a debug build on the physical target d
 - [x] Search, Playlists, Queue, Now Playing, and Settings opened.
 - [x] Playlist and queue interactions worked within the smoke-test scope.
 - [x] Attempted source playback showed a visible `Source Error` without crashing the app.
-- [ ] Successful source audio resolution and playback remain unverified and blocked by the current source failure.
+- [ ] Successful source playback was not observed in this smoke test; retest with a provenance-complete build containing the validated NewPipe `v0.26.5` update.
 
 ## Samsung Galaxy A36 acceptance
 

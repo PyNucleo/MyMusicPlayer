@@ -13,7 +13,7 @@ Machine-oriented implementation truth. Read `PROJECT_CONTEXT_AND_ROADMAP.md` and
 - Local deterministic suite: 39 discovered, 38 passed, 0 failed/errors, 1 skipped guarded live canary.
 - Debug lint: 0 errors, 9 dependency-version availability warnings.
 - `compileDebugAndroidTestKotlin`, `assembleDebug`, and unsigned `assembleRelease` pass.
-- External gates: a Samsung Galaxy A36 debug-build smoke test passed for install, launch, navigation, playlist/queue interaction, and graceful visible source failure; current public-source audio canary still fails; exact device/API/build and connected-test evidence are not recorded; no permanent user-controlled signing key/credentials exist.
+- External gates: a Samsung Galaxy A36 debug-build smoke test passed for install, launch, navigation, playlist/queue interaction, and graceful visible source failure; the host public-source audio canary passes after the local NewPipe `v0.26.5` update, but the rebuilt debug APK has not been retested on-device; exact device/API/build and connected-test evidence are not recorded; no permanent user-controlled signing key/credentials exist.
 - Roadmap lock SHA-256: `304FD58BF93FE7DF57FCD09C0BE5123DB5BD374455FABEB8CCB4B942A8F97584`.
 
 ## Toolchain and pinned dependencies
@@ -25,7 +25,7 @@ Machine-oriented implementation truth. Read `PROJECT_CONTEXT_AND_ROADMAP.md` and
 - Core KTX `1.18.0`; Lifecycle/ViewModel `2.11.0`; coroutines `1.10.2`.
 - Room `2.8.4`; schema version `1`; export: `app/schemas/com.admin.mymusicplayer.data.database.MusicDatabase/1.json`.
 - Media3 `1.10.1`; OkHttp `5.2.1`.
-- NewPipe Extractor `v0.26.2` from JitPack; Gson `2.14.0`.
+- NewPipe Extractor `v0.26.5` from JitPack; Gson `2.14.0`.
 - Coil Compose/network OkHttp `3.5.0`.
 - JUnit `4.13.2`; Truth `1.4.5`; Robolectric `4.16.1`; AndroidX Test Core `1.7.0`, rules `1.7.0`, ext JUnit `1.3.0`, Espresso `3.7.0`.
 - Lint currently reports newer Gradle/Core/Media3/coroutines/OkHttp versions. These are informational. Do not mix dependency upgrades into compatibility repair; update intentionally and rerun deterministic, live, and device acceptance suites.
@@ -39,7 +39,9 @@ Version references used for the baseline:
 - `https://developer.android.com/jetpack/androidx/releases/room`
 - `https://developer.android.com/jetpack/androidx/releases/media3`
 - `https://kotlinlang.org/docs/ksp-quickstart.html`
-- `https://github.com/TeamNewPipe/NewPipeExtractor/releases/tag/v0.26.2`
+- `https://github.com/TeamNewPipe/NewPipeExtractor/releases/tag/v0.26.5`
+- `https://github.com/TeamNewPipe/NewPipeExtractor/releases/tag/v0.26.3`
+- `https://github.com/TeamNewPipe/NewPipeExtractor/pull/1508`
 - `https://coil-kt.github.io/coil/compose/`
 
 ## Host environment
@@ -119,7 +121,9 @@ Command:
   -DliveSourceTests=true
 ```
 
-2026-08-19 result: failed. Public search returned results, but resolution threw `SourceFailure(EXTRACTOR_COMPATIBILITY)` caused by `IllegalStateException: No playable audio-only stream was returned`. NewPipe Extractor `v0.26.2` was the latest official release checked. Upstream-aligned Firefox ESR user agent, 30-second read timeout, and explicit HTTP 429 anti-bot mapping were applied; the canary still failed. This is an upstream/source availability gate, not permission to bypass access controls.
+2026-08-19 fresh baseline: failed on pinned NewPipe Extractor `v0.26.2`. Public search returned results, but resolution threw `SourceFailure(EXTRACTOR_COMPATIBILITY)` caused by `IllegalStateException: No playable audio-only stream was returned`.
+
+2026-08-19 upstream validation: passed after the smallest official update to `v0.26.5`. TeamNewPipe shipped the relevant YouTube fix in `v0.26.3` via PR #1508, using a visionOS player-client fallback to obtain ordinary adaptive formats when the former client receives SABR-only responses. The merged path uses anonymous visitor data and does not add a PoToken provider, account/authentication, challenge solving, DRM handling, or an app-side bypass. `v0.26.5` is the current official release and includes that fix. No source-adapter logic changed.
 
 Healthy canary behavior: exits 0 after a public search result resolves to a transient HTTPS audio stream; it does not build, mutate Room, repair code, sign, or release.
 
@@ -190,7 +194,7 @@ Device discovery:
 - `assembleDebug`: build success; `app/build/outputs/apk/debug/app-debug.apk`.
 - `assembleRelease`: build success without signing environment; `app/build/outputs/apk/release/app-release-unsigned.apk`.
 - `connectedDebugAndroidTest`: not run; no authorized device/emulator.
-- Live canary: run separately and failed as documented above.
+- Live canary: run separately; `v0.26.2` baseline failed and `v0.26.5` passed as documented above.
 
 ## Release signing
 
@@ -201,7 +205,7 @@ Device discovery:
 
 ## Remaining release gates
 
-- Restore successful source audio resolution without crossing the hard-stop boundary; rerun canary.
+- Install and retest the rebuilt `v0.26.5` debug APK on the Samsung Galaxy A36; host resolution now passes, but successful device playback has not yet been observed.
 - Record the Samsung Galaxy A36 Android version/API/build fingerprint and ADB authorization; the debug-build smoke test above does not replace connected-test evidence.
 - Run connected tests and the remaining full manual device matrix in `RELEASE_CHECKLIST.md`: successful real search/playback, background/lock/Bluetooth/noisy/focus, long queue, process death, shuffle/repeat, complete playlist operations/Undo, backup/clean restore, update-over-old-data, and diagnostics.
 - Create and offline-back up permanent user-controlled JKS; set environment credentials; build and verify signed release APK.
@@ -210,10 +214,12 @@ Device discovery:
 
 ## Last compatibility repair
 
-2026-08-19 source adapter repair:
+2026-08-19 upstream dependency repair:
 
-- Replaced custom downloader user agent with the current Firefox ESR string used by upstream NewPipe.
-- Added upstream-equivalent 30-second read timeout and explicit HTTP 429 → `ReCaptchaException` mapping.
-- Removed an unjustified progressive-HTTP-only filter; resolver now evaluates all URL-backed audio-only streams.
-- Deterministic tests/build/lint remain green.
-- Live canary still returns no audio-only streams; source path stopped and external compatibility gate recorded.
+- Reproduced the `v0.26.2` failure: search succeeded, but resolution returned no URL-backed audio-only stream.
+- Verified TeamNewPipe's official `v0.26.3` SABR/player-client compatibility fix and current official release `v0.26.5`.
+- Updated only the pinned extractor dependency and reported BuildConfig/diagnostic version from `v0.26.2` to `v0.26.5`; NewPipe adapter logic is unchanged.
+- Did not add authentication, cookies/tokens, a PoToken provider, challenge solving, proxying, DRM handling, or any access-control bypass.
+- The same guarded live canary passes on `v0.26.5`.
+- `testDebugUnitTest`, `lintDebug`, `compileDebugAndroidTestKotlin`, and `assembleDebug` pass; 39 tests discovered, 38 passed, 1 guarded live canary skipped in the deterministic run, 0 failures/errors, and lint remains at 0 errors/9 update notices.
+- Commit compatibility changes before rebuilding device-test artifacts; never release an APK built from a dirty tree because its embedded Git SHA would not identify the complete source.
