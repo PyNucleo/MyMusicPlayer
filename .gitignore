@@ -1,0 +1,16 @@
+*.iml
+.gradle/
+.gradle-user-home/
+.tools/
+.android-user-home/
+.idea/
+local.properties
+**/build/
+captures/
+.externalNativeBuild/
+.cxx/
+keystore.properties
+*.jks
+*.keystore
+diagnostics/
+release-output/
