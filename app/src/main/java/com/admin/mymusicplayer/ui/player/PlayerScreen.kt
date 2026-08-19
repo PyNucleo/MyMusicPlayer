@@ -31,8 +31,10 @@ fun PlayerScreen(viewModel: PlayerViewModel = viewModel()) {
         Text("Now Playing", style = MaterialTheme.typography.labelLarge)
         Text(state.title, style = MaterialTheme.typography.headlineMedium, modifier = Modifier.padding(top = 24.dp))
         Text(state.uploader, style = MaterialTheme.typography.bodyLarge)
+        if (state.isBuffering) Text("Buffering…", modifier = Modifier.padding(top = 8.dp))
+        state.error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
         Slider(
-            value = state.positionMs.toFloat(),
+            value = state.positionMs.coerceIn(0, state.durationMs.coerceAtLeast(1)).toFloat(),
             onValueChange = { viewModel.onEvent(PlayerEvent.Seek(it.toLong())) },
             valueRange = 0f..state.durationMs.toFloat().coerceAtLeast(1f),
             modifier = Modifier.fillMaxWidth().padding(top = 24.dp),
@@ -52,6 +54,9 @@ fun PlayerScreen(viewModel: PlayerViewModel = viewModel()) {
             OutlinedButton(onClick = { viewModel.onEvent(PlayerEvent.ToggleShuffle) }) {
                 Text(if (state.shuffleEnabled) "Shuffle On" else "Shuffle Off")
             }
+            if (state.shuffleEnabled) {
+                OutlinedButton(onClick = { viewModel.onEvent(PlayerEvent.Reshuffle) }) { Text("Reshuffle") }
+            }
             OutlinedButton(onClick = { viewModel.onEvent(PlayerEvent.CycleRepeat) }) {
                 Text(
                     when (state.repeatMode) {
@@ -62,7 +67,7 @@ fun PlayerScreen(viewModel: PlayerViewModel = viewModel()) {
                 )
             }
         }
-        Text("Deterministic fake playback; native player arrives in Milestone 4", modifier = Modifier.padding(top = 24.dp))
+        Text("Native background playback", modifier = Modifier.padding(top = 24.dp))
     }
 }
 
@@ -70,4 +75,3 @@ private fun formatTime(ms: Long): String {
     val seconds = ms / 1_000
     return "%d:%02d".format(seconds / 60, seconds % 60)
 }
-

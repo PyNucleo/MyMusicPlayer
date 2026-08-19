@@ -76,6 +76,20 @@ object FakeLibraryStore {
     }
 
     @Synchronized
+    fun reorderTrack(playlistId: Long, identity: SourceIdentity, targetIndex: Int) {
+        _records.value = _records.value.map { record ->
+            if (record.playlist.id != playlistId) return@map record
+            val fromIndex = record.tracks.indexOfFirst { it.sourceIdentity == identity }
+            require(fromIndex >= 0) { "Track is no longer in this playlist" }
+            require(targetIndex in record.tracks.indices) { "Target position is outside the playlist" }
+            val reordered = record.tracks.toMutableList()
+            val moved = reordered.removeAt(fromIndex)
+            reordered.add(targetIndex, moved)
+            record.withTracks(reordered)
+        }
+    }
+
+    @Synchronized
     fun removeSelected(sourcePlaylistId: Long, selected: Set<SourceIdentity>) {
         require(selected.isNotEmpty()) { "No tracks selected" }
         _records.value = _records.value.map { record ->
@@ -162,4 +176,3 @@ object FakeLibraryStore {
         )
     }
 }
-

@@ -47,11 +47,38 @@ android {
     }
 }
 
+val robolectricSdk = configurations.create("robolectricSdk")
+val robolectricDependencies = rootProject.layout.projectDirectory.dir(".tools/robolectric")
+val robolectricSdkJar = robolectricDependencies.file(
+    "android-all-instrumented-15-robolectric-13954326-i7.jar",
+)
+val prepareRobolectricDependencies = tasks.register("prepareRobolectricDependencies") {
+    doLast {
+        val target = robolectricSdkJar.asFile
+        if (!target.isFile) {
+            target.parentFile.mkdirs()
+            copy {
+                from(robolectricSdk)
+                into(target.parentFile)
+            }
+        }
+    }
+}
+
+tasks.withType<org.gradle.api.tasks.testing.Test>().configureEach {
+    dependsOn(prepareRobolectricDependencies)
+    systemProperty("robolectric.offline", "true")
+    systemProperty("robolectric.dependency.dir", robolectricDependencies.asFile.absolutePath)
+    systemProperty("liveSourceTests", providers.systemProperty("liveSourceTests").getOrElse("false"))
+}
+
 room {
     schemaDirectory("$projectDir/schemas")
 }
 
 dependencies {
+    add(robolectricSdk.name, "org.robolectric:android-all-instrumented:15-robolectric-13954326-i7")
+
     val composeBom = platform("androidx.compose:compose-bom:2026.06.00")
     implementation(composeBom)
     androidTestImplementation(composeBom)
@@ -79,6 +106,8 @@ dependencies {
 
     implementation("com.github.TeamNewPipe:NewPipeExtractor:v0.26.2")
     implementation("com.google.code.gson:gson:2.14.0")
+    implementation("io.coil-kt.coil3:coil-compose:3.5.0")
+    implementation("io.coil-kt.coil3:coil-network-okhttp:3.5.0")
 
     testImplementation("junit:junit:4.13.2")
     testImplementation("com.google.truth:truth:1.4.5")
@@ -89,6 +118,7 @@ dependencies {
 
     androidTestImplementation("androidx.test.ext:junit:1.3.0")
     androidTestImplementation("androidx.test.espresso:espresso-core:3.7.0")
+    androidTestImplementation("androidx.test:rules:1.7.0")
     androidTestImplementation("androidx.compose.ui:ui-test-junit4")
     androidTestImplementation("androidx.room:room-testing:2.8.4")
 

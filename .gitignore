@@ -13,5 +13,5 @@ captures/
 keystore.properties
 *.jks
 *.keystore
-diagnostics/
+/diagnostics/
 release-output/

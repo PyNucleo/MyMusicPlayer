@@ -42,7 +42,7 @@ fun QueueScreen(viewModel: QueueViewModel = viewModel()) {
         LazyColumn(Modifier.weight(1f)) {
             itemsIndexed(
                 snapshot.entries,
-                key = { _, track -> "${track.sourceType}:${track.sourceMediaId}" },
+                key = { index, track -> "$index:${track.sourceType}:${track.sourceMediaId}" },
             ) { index, track ->
                 if (index > snapshot.currentIndex) {
                     Row(
@@ -50,8 +50,14 @@ fun QueueScreen(viewModel: QueueViewModel = viewModel()) {
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         Text(track.title, modifier = Modifier.weight(1f))
-                        TextButton(onClick = { viewModel.onEvent(QueueEvent.MoveUp(index)) }) { Text("↑") }
-                        TextButton(onClick = { viewModel.onEvent(QueueEvent.MoveDown(index)) }) { Text("↓") }
+                        TextButton(
+                            onClick = { viewModel.onEvent(QueueEvent.MoveUp(index)) },
+                            enabled = index > snapshot.currentIndex + 1,
+                        ) { Text("↑") }
+                        TextButton(
+                            onClick = { viewModel.onEvent(QueueEvent.MoveDown(index)) },
+                            enabled = index < snapshot.entries.lastIndex,
+                        ) { Text("↓") }
                         TextButton(onClick = { viewModel.onEvent(QueueEvent.Remove(index)) }) { Text("Remove") }
                     }
                     HorizontalDivider()
@@ -60,4 +66,3 @@ fun QueueScreen(viewModel: QueueViewModel = viewModel()) {
         }
     }
 }
-

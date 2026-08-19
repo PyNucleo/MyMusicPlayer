@@ -12,6 +12,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
@@ -36,11 +37,15 @@ fun PlaylistsScreen(
     val state by viewModel.state.collectAsStateWithLifecycle()
     var createDialog by remember { mutableStateOf(false) }
     var renameTarget by remember { mutableStateOf<PlaylistSummaryUi?>(null) }
+    var importDialog by remember { mutableStateOf(false) }
 
     Column(Modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
             Text("Playlists", style = MaterialTheme.typography.headlineMedium)
-            Button(onClick = { createDialog = true }) { Text("Create") }
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedButton(onClick = { importDialog = true }) { Text("Import") }
+                Button(onClick = { createDialog = true }) { Text("Create") }
+            }
         }
         OutlinedTextField(
             value = state.filter,
@@ -50,6 +55,8 @@ fun PlaylistsScreen(
             modifier = Modifier.fillMaxWidth(),
         )
         state.error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
+        state.message?.let { Text(it) }
+        if (state.importBusy) CircularProgressIndicator(Modifier.align(Alignment.CenterHorizontally))
         LazyColumn(Modifier.weight(1f)) {
             items(state.playlists, key = { it.playlist.id }) { item ->
                 Row(
@@ -93,18 +100,49 @@ fun PlaylistsScreen(
             onDismiss = { renameTarget = null },
         )
     }
+    if (importDialog) {
+        NameDialog(
+            title = "Public YouTube playlist URL",
+            initial = "",
+            fieldLabel = "Playlist URL",
+            confirmLabel = "Preview",
+            onConfirm = { url ->
+                viewModel.inspectImport(url)
+                importDialog = false
+            },
+            onDismiss = { importDialog = false },
+        )
+    }
+    state.pendingImport?.let { preview ->
+        AlertDialog(
+            onDismissRequest = viewModel::cancelImport,
+            title = { Text("Import ${preview.suggestedName}?") },
+            text = {
+                Text("${preview.tracks.size} tracks are ready; ${preview.skippedCount} duplicate or inaccessible items will be skipped.")
+            },
+            confirmButton = { Button(onClick = viewModel::confirmImport) { Text("Import") } },
+            dismissButton = { OutlinedButton(onClick = viewModel::cancelImport) { Text("Cancel") } },
+        )
+    }
 }
 
 @Composable
-private fun NameDialog(title: String, initial: String, onConfirm: (String) -> Unit, onDismiss: () -> Unit) {
+private fun NameDialog(
+    title: String,
+    initial: String,
+    fieldLabel: String = "Name",
+    confirmLabel: String = "Save",
+    onConfirm: (String) -> Unit,
+    onDismiss: () -> Unit,
+) {
     var name by remember(initial) { mutableStateOf(initial) }
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text(title) },
         text = {
-            OutlinedTextField(value = name, onValueChange = { name = it }, label = { Text("Name") })
+            OutlinedTextField(value = name, onValueChange = { name = it }, label = { Text(fieldLabel) })
         },
-        confirmButton = { Button(onClick = { onConfirm(name) }, enabled = name.isNotBlank()) { Text("Save") } },
+        confirmButton = { Button(onClick = { onConfirm(name) }, enabled = name.isNotBlank()) { Text(confirmLabel) } },
         dismissButton = { OutlinedButton(onClick = onDismiss) { Text("Cancel") } },
     )
 }

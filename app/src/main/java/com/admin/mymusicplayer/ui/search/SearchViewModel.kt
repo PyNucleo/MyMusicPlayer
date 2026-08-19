@@ -2,7 +2,10 @@ package com.admin.mymusicplayer.ui.search
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.admin.mymusicplayer.data.fake.FakeLibraryStore
+import com.admin.mymusicplayer.data.repository.FakeLibraryRepository
+import com.admin.mymusicplayer.data.repository.LibraryRepository
+import com.admin.mymusicplayer.data.repository.SessionRepository
+import com.admin.mymusicplayer.playback.PlaybackQueueController
 import com.admin.mymusicplayer.search.FakeSearchProvider
 import com.admin.mymusicplayer.search.SearchPageToken
 import com.admin.mymusicplayer.search.SearchProvider
@@ -22,6 +25,7 @@ data class SearchUiState(
     val isLoadingMore: Boolean = false,
     val error: String? = null,
     val notice: String? = null,
+    val playlistTargets: List<Pair<Long, String>> = emptyList(),
 )
 
 sealed interface SearchEvent {
@@ -29,17 +33,33 @@ sealed interface SearchEvent {
     data object Submit : SearchEvent
     data object Retry : SearchEvent
     data object LoadMore : SearchEvent
-    data class AddToPlaylist(val result: SearchResultItem, val playlistId: Long = 1) : SearchEvent
+    data class AddToPlaylist(val result: SearchResultItem, val playlistId: Long? = null) : SearchEvent
+    data class PlayNow(val result: SearchResultItem) : SearchEvent
+    data class PlayNext(val result: SearchResultItem) : SearchEvent
+    data class AddToQueue(val result: SearchResultItem) : SearchEvent
     data object NoticeShown : SearchEvent
 }
 
 class SearchViewModel(
     private val provider: SearchProvider = FakeSearchProvider(),
+    private val libraryRepository: LibraryRepository = FakeLibraryRepository(),
+    private val sessionRepository: SessionRepository? = null,
+    private val playbackController: PlaybackQueueController? = null,
 ) : ViewModel() {
     private val _state = MutableStateFlow(SearchUiState())
     val state: StateFlow<SearchUiState> = _state.asStateFlow()
     private var activeSearch: Job? = null
     private var requestId = 0L
+
+    init {
+        viewModelScope.launch {
+            libraryRepository.playlists.collect { playlists ->
+                _state.value = _state.value.copy(
+                    playlistTargets = playlists.map { it.playlist.id to it.playlist.name },
+                )
+            }
+        }
+    }
 
     fun onEvent(event: SearchEvent) {
         when (event) {
@@ -48,6 +68,21 @@ class SearchViewModel(
             SearchEvent.Retry -> submit(_state.value.submittedQuery.ifBlank { _state.value.query }, append = false)
             SearchEvent.LoadMore -> submit(_state.value.submittedQuery, append = true)
             is SearchEvent.AddToPlaylist -> addToPlaylist(event)
+            is SearchEvent.PlayNow -> queueAction(
+                success = "Playing now",
+                persistentAction = { it.playNow(event.result.asTrack()) },
+                playbackAction = { it.playNow(event.result.asTrack()) },
+            )
+            is SearchEvent.PlayNext -> queueAction(
+                success = "Added to play next",
+                persistentAction = { it.playNext(event.result.asTrack()) },
+                playbackAction = { it.playNext(event.result.asTrack()) },
+            )
+            is SearchEvent.AddToQueue -> queueAction(
+                success = "Added to queue",
+                persistentAction = { it.addToQueue(event.result.asTrack()) },
+                playbackAction = { it.addToQueue(event.result.asTrack()) },
+            )
             SearchEvent.NoticeShown -> _state.value = _state.value.copy(notice = null)
         }
     }
@@ -93,10 +128,41 @@ class SearchViewModel(
     }
 
     private fun addToPlaylist(event: SearchEvent.AddToPlaylist) {
-        val added = FakeLibraryStore.addTrack(event.playlistId, event.result.asTrack())
-        _state.value = _state.value.copy(
-            notice = if (added) "Added to Road Trip" else "Already in Road Trip",
-        )
+        val target = event.playlistId ?: _state.value.playlistTargets.firstOrNull()?.first
+        if (target == null) {
+            _state.value = _state.value.copy(notice = "Create a playlist first")
+            return
+        }
+        val targetName = _state.value.playlistTargets.firstOrNull { it.first == target }?.second ?: "playlist"
+        viewModelScope.launch {
+            runCatching { libraryRepository.addTrack(target, event.result.asTrack()) }
+                .onSuccess { added ->
+                    _state.value = _state.value.copy(
+                        notice = if (added) "Added to $targetName" else "Already in $targetName",
+                    )
+                }
+                .onFailure { _state.value = _state.value.copy(notice = it.message ?: "Add failed") }
+        }
+    }
+
+    private fun queueAction(
+        success: String,
+        persistentAction: suspend (SessionRepository) -> Unit,
+        playbackAction: suspend (PlaybackQueueController) -> Unit,
+    ) {
+        val playback = playbackController
+        val repository = sessionRepository
+        if (playback == null && repository == null) {
+            _state.value = _state.value.copy(notice = "$success (fake)")
+            return
+        }
+        viewModelScope.launch {
+            runCatching {
+                if (playback != null) playbackAction(playback)
+                else persistentAction(requireNotNull(repository))
+            }
+                .onSuccess { _state.value = _state.value.copy(notice = success) }
+                .onFailure { _state.value = _state.value.copy(notice = it.message ?: "Queue action failed") }
+        }
     }
 }
-

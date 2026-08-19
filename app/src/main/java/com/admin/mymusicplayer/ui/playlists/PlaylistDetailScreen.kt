@@ -15,6 +15,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -55,6 +56,13 @@ fun PlaylistDetailScreen(viewModel: PlaylistDetailViewModel, onBack: () -> Unit)
         } else {
             Text("Long-press a track to select it", style = MaterialTheme.typography.bodyMedium)
         }
+        OutlinedTextField(
+            value = state.filter,
+            onValueChange = { viewModel.onEvent(PlaylistDetailEvent.FilterChanged(it)) },
+            label = { Text("Search in playlist") },
+            singleLine = true,
+            modifier = Modifier.fillMaxWidth(),
+        )
         state.message?.let { message ->
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(message, modifier = Modifier.weight(1f))
@@ -63,15 +71,18 @@ fun PlaylistDetailScreen(viewModel: PlaylistDetailViewModel, onBack: () -> Unit)
         }
         LazyColumn(Modifier.weight(1f)) {
             itemsIndexed(
-                state.tracks,
+                state.visibleTracks,
                 key = { _, track -> "${track.sourceType}:${track.sourceMediaId}" },
             ) { index, track ->
                 val selected = track.sourceIdentity in state.selected
+                val actualIndex = state.tracks.indexOfFirst { it.sourceIdentity == track.sourceIdentity }
                 Row(
                     Modifier.fillMaxWidth().combinedClickable(
                         onClick = {
                             if (state.selected.isNotEmpty()) {
                                 viewModel.onEvent(PlaylistDetailEvent.ToggleSelection(track.sourceIdentity))
+                            } else {
+                                viewModel.onEvent(PlaylistDetailEvent.PlayTrack(track))
                             }
                         },
                         onLongClick = { viewModel.onEvent(PlaylistDetailEvent.ToggleSelection(track.sourceIdentity)) },
@@ -79,9 +90,23 @@ fun PlaylistDetailScreen(viewModel: PlaylistDetailViewModel, onBack: () -> Unit)
                     horizontalArrangement = Arrangement.spacedBy(10.dp),
                 ) {
                     Text(if (selected) "✓" else "${index + 1}")
-                    Column {
+                    Column(Modifier.weight(1f)) {
                         Text(track.title, style = MaterialTheme.typography.titleMedium)
                         Text(track.uploader.orEmpty())
+                    }
+                    if (state.selected.isEmpty()) {
+                        TextButton(
+                            onClick = {
+                                viewModel.onEvent(PlaylistDetailEvent.Reorder(track.sourceIdentity, actualIndex - 1))
+                            },
+                            enabled = actualIndex > 0,
+                        ) { Text("↑") }
+                        TextButton(
+                            onClick = {
+                                viewModel.onEvent(PlaylistDetailEvent.Reorder(track.sourceIdentity, actualIndex + 1))
+                            },
+                            enabled = actualIndex in 0 until state.tracks.lastIndex,
+                        ) { Text("↓") }
                     }
                 }
                 HorizontalDivider()
@@ -111,4 +136,3 @@ fun PlaylistDetailScreen(viewModel: PlaylistDetailViewModel, onBack: () -> Unit)
         )
     }
 }
-
