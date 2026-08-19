@@ -1,6 +1,6 @@
 # v0.1 Release Checklist
 
-Status: local release candidate; not signed, tagged, or device-approved.
+Status: private debug prerelease available for testing; not signed, tagged `v0.1.0`, or device-approved for final release.
 
 Recorded 2026-08-19. A checked item has direct local evidence. Device/source/signing items remain unchecked until executed in the stated environment. Do not create `v0.1.0` while any required item is unchecked.
 
@@ -29,14 +29,24 @@ Recorded 2026-08-19. A checked item has direct local evidence. Device/source/sig
 - [ ] Real target-device search, watch/share URL, pagination, Play, Play Next, Queue, Add to Playlist, and public playlist import pass.
 - [x] DRM/authentication/bot/access-control/age/region/private/paid/anti-copying hard-stop behavior is explicit; no bypass is implemented.
 
+## Samsung Galaxy A36 debug-build smoke test — 2026-08-19
+
+Scope: user-reported manual smoke test of a debug build on the physical target device. This is not signed-release approval and does not clear the public-source, signing, or full device-acceptance gates.
+
+- [x] Debug build installed and launched without crashing.
+- [x] Search, Playlists, Queue, Now Playing, and Settings opened.
+- [x] Playlist and queue interactions worked within the smoke-test scope.
+- [x] Attempted source playback showed a visible `Source Error` without crashing the app.
+- [ ] Successful source audio resolution and playback remain unverified and blocked by the current source failure.
+
 ## Samsung Galaxy A36 acceptance
 
 Record before testing:
 
-- Model: pending
+- Model: Samsung Galaxy A36 (manual debug-build smoke test confirmed)
 - Android version / API: pending
 - Build fingerprint: pending
-- ADB authorization: pending
+- ADB authorization: not recorded
 
 Required tests:
 

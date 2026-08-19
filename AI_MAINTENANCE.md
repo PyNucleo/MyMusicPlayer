@@ -9,10 +9,11 @@ Machine-oriented implementation truth. Read `PROJECT_CONTEXT_AND_ROADMAP.md` and
 - Version: `0.1.0`, `versionCode = 1`.
 - Implementation checkpoint: `c8ca48b` (`Complete persistent playback and data safety features`).
 - No `v0.1.0` tag exists. Do not create it until every item in `RELEASE_CHECKLIST.md` passes.
+- Private repository: `https://github.com/PyNucleo/MyMusicPlayer`; private debug prerelease `device-test-0.1.0-debug-0fe5538` targets `0fe5538` and contains only `app-debug.apk`.
 - Local deterministic suite: 39 discovered, 38 passed, 0 failed/errors, 1 skipped guarded live canary.
 - Debug lint: 0 errors, 9 dependency-version availability warnings.
 - `compileDebugAndroidTestKotlin`, `assembleDebug`, and unsigned `assembleRelease` pass.
-- External gates: no authorized target device; current public-source audio canary fails; no permanent user-controlled signing key/credentials.
+- External gates: a Samsung Galaxy A36 debug-build smoke test passed for install, launch, navigation, playlist/queue interaction, and graceful visible source failure; current public-source audio canary still fails; exact device/API/build and connected-test evidence are not recorded; no permanent user-controlled signing key/credentials exist.
 - Roadmap lock SHA-256: `304FD58BF93FE7DF57FCD09C0BE5123DB5BD374455FABEB8CCB4B942A8F97584`.
 
 ## Toolchain and pinned dependencies
@@ -122,6 +123,17 @@ Command:
 
 Healthy canary behavior: exits 0 after a public search result resolves to a transient HTTPS audio stream; it does not build, mutate Room, repair code, sign, or release.
 
+### Samsung Galaxy A36 debug-build smoke test
+
+2026-08-19 user-reported manual result on the physical Samsung Galaxy A36:
+
+- The debug build installed and launched.
+- Search, Playlists, Queue, Now Playing, and Settings opened.
+- Playlist and queue interactions worked during the smoke-test scope.
+- Attempted source playback produced a visible `Source Error` and did not crash the app.
+
+This confirms the debug build's basic device launch/navigation path and finite visible source-failure behavior. It does not demonstrate successful source audio resolution or playback, and it is not signed-release acceptance. Android version/API, build fingerprint, ADB authorization, connected tests, background/media controls, persistence/recovery, backup/restore, upgrade, and the rest of the device matrix remain unverified.
+
 ## Media3 playback
 
 - `PlaybackService` extends `MediaSessionService` and owns `ExoPlayer`, `MediaSession`, audio focus/noisy handling, and notification/lock-screen/Bluetooth transport integration.
@@ -190,11 +202,11 @@ Device discovery:
 ## Remaining release gates
 
 - Restore successful source audio resolution without crossing the hard-stop boundary; rerun canary.
-- Connect/authorize the Samsung Galaxy A36; record exact model/API/build.
-- Run connected tests and full manual device matrix in `RELEASE_CHECKLIST.md`: real search/playback, background/lock/Bluetooth/noisy/focus, long queue, process death, shuffle/repeat, playlist operations/Undo, backup/clean restore, update-over-old-data, diagnostics.
+- Record the Samsung Galaxy A36 Android version/API/build fingerprint and ADB authorization; the debug-build smoke test above does not replace connected-test evidence.
+- Run connected tests and the remaining full manual device matrix in `RELEASE_CHECKLIST.md`: successful real search/playback, background/lock/Bluetooth/noisy/focus, long queue, process death, shuffle/repeat, complete playlist operations/Undo, backup/clean restore, update-over-old-data, and diagnostics.
 - Create and offline-back up permanent user-controlled JKS; set environment credentials; build and verify signed release APK.
 - Install signed APK on target; confirm embedded Git commit; only then create annotated `v0.1.0` tag.
-- No remote repository is configured or published.
+- `origin` is the private `PyNucleo/MyMusicPlayer` repository. The existing debug prerelease is for device testing only; it is not a signed release or a last-known-good `v0.1.0` release.
 
 ## Last compatibility repair
 
