@@ -3,6 +3,7 @@
 .gradle-user-home/
 .tools/
 .android-user-home/
+.kotlin/
 .idea/
 local.properties
 **/build/

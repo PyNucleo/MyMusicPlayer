@@ -48,13 +48,15 @@ Primary version references:
 ## Package boundaries
 
 - `app/src/main/java/com/admin/mymusicplayer/domain`: source-neutral models and verified pure shuffle/repeat/queue policies
-- `.../search`: `SearchProvider`, fake provider, and isolated YouTube adapter
-- `.../resolver`: `AudioResolver`, fake resolver, and isolated YouTube adapter
+- `app/src/main/java/com/admin/mymusicplayer/search`: source-neutral `SearchProvider`, result/page contracts, deterministic `FakeSearchProvider`; real adapter pending Milestone 5
+- `app/src/main/java/com/admin/mymusicplayer/resolver`: source-neutral `AudioResolver`/`PlayableAudio` and deterministic `FakeAudioResolver`; real adapter pending Milestone 5
+- `app/src/main/java/com/admin/mymusicplayer/data/fake`: shared deterministic fake playlist store used only by the Milestone 2 UI
 - `.../data/database`, `.../data/dao`, `.../data/repository`: Room entities, DAOs, transactional library/session persistence
 - `.../data/backup`: versioned portable JSON backup/restore and validation
 - `.../data/diagnostics`: bounded local-only diagnostic events/bundles
 - `.../playback`: queue manager, persistent session repository, `PlayerController`, Media3 `PlaybackService`
-- `.../ui/search`, `.../ui/playlists`, `.../ui/queue`, `.../ui/player`, `.../ui/settings`: Compose UI with explicit state/event ViewModels
+- `app/src/main/java/com/admin/mymusicplayer/ui`: Navigation Compose shell with Search, Playlists/detail, Queue, and Now Playing screens
+- `.../ui/search`, `.../ui/playlists`, `.../ui/queue`, `.../ui/player`: explicit immutable state/event ViewModels; settings pending Milestone 6
 
 No NewPipe type may cross into domain models, database entities, UI contracts/state, queue, shuffle, or repeat logic.
 
@@ -138,6 +140,7 @@ Canary command: not available until the isolated source adapter test is implemen
 ## Known issues / blockers
 
 - Milestone 1 verified 2026-08-19: `testDebugUnitTest` passed 20 tests with 0 failures/errors; `assembleDebug` produced `app/build/outputs/apk/debug/app-debug.apk`. The APK is only a bootstrap shell until later milestones.
+- Milestone 2 verified 2026-08-19: deterministic four-screen Compose UI and playlist detail flow compile; rapid stale-search replacement, finite failure/retry, fake transactional order/duplicate behavior, and player reducer tests bring the unit total to 25/25. UI/device interaction remains pending physical-device verification.
 - Physical Samsung Galaxy A36 connection, API level, install, background playback, media controls, noisy-device behavior, update survival, and clean restore are unverified.
 - Network dependency resolution, NewPipe canary behavior, and legal/technical availability of individual public sources are unverified.
 - Release signing identity requires user-controlled secret backup before a release can be called complete.
