@@ -5,6 +5,17 @@ plugins {
     id("androidx.room")
 }
 
+val releaseStorePath = providers.environmentVariable("MY_MUSIC_PLAYER_KEYSTORE_PATH").orNull
+val releaseStorePassword = providers.environmentVariable("MY_MUSIC_PLAYER_KEYSTORE_PASSWORD").orNull
+val releaseKeyAlias = providers.environmentVariable("MY_MUSIC_PLAYER_KEY_ALIAS").orNull
+val releaseKeyPassword = providers.environmentVariable("MY_MUSIC_PLAYER_KEY_PASSWORD").orNull
+val releaseSigningAvailable = listOf(
+    releaseStorePath,
+    releaseStorePassword,
+    releaseKeyAlias,
+    releaseKeyPassword,
+).all { !it.isNullOrBlank() }
+
 android {
     namespace = "com.admin.mymusicplayer"
     compileSdk = 37
@@ -28,6 +39,25 @@ android {
     buildFeatures {
         compose = true
         buildConfig = true
+    }
+
+    signingConfigs {
+        if (releaseSigningAvailable) {
+            create("release") {
+                storeFile = rootProject.file(requireNotNull(releaseStorePath))
+                storePassword = requireNotNull(releaseStorePassword)
+                keyAlias = requireNotNull(releaseKeyAlias)
+                keyPassword = requireNotNull(releaseKeyPassword)
+            }
+        }
+    }
+
+    buildTypes {
+        getByName("release") {
+            if (releaseSigningAvailable) {
+                signingConfig = signingConfigs.getByName("release")
+            }
+        }
     }
 
     compileOptions {

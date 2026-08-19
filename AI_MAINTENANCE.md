@@ -1,126 +1,167 @@
 # AI Maintenance Record
 
-This file records implementation reality. The authoritative requirements and permanent invariants are in `PROJECT_CONTEXT_AND_ROADMAP.md`.
+Machine-oriented implementation truth. Read `PROJECT_CONTEXT_AND_ROADMAP.md` and `AGENTS.md` first. Update this file whenever architecture, dependencies, persistence, playback, source adapters, build/release behavior, canary status, or known issues change.
 
-## Identity and repository
+## Current state — 2026-08-19
 
-- Application ID / Kotlin namespace: `com.admin.mymusicplayer` (permanent)
-- Gradle layout: one `:app` Android application module
-- Version: `0.1.0`, `versionCode = 1`
-- Git tags: annotated `vMAJOR.MINOR.PATCH`; `v0.1.0` is created only after every v0.1 release requirement passes
-- Forward rollback: build the last-known-good tag with a higher `versionCode`; never change application ID, signing identity, or data compatibility
-- Roadmap lock SHA-256: `304FD58BF93FE7DF57FCD09C0BE5123DB5BD374455FABEB8CCB4B942A8F97584`
+- v0.1 code is implemented and locally verified as a release candidate.
+- Permanent application ID / namespace: `com.admin.mymusicplayer`.
+- Version: `0.1.0`, `versionCode = 1`.
+- Implementation checkpoint: `c8ca48b` (`Complete persistent playback and data safety features`).
+- No `v0.1.0` tag exists. Do not create it until every item in `RELEASE_CHECKLIST.md` passes.
+- Local deterministic suite: 39 discovered, 38 passed, 0 failed/errors, 1 skipped guarded live canary.
+- Debug lint: 0 errors, 9 dependency-version availability warnings.
+- `compileDebugAndroidTestKotlin`, `assembleDebug`, and unsigned `assembleRelease` pass.
+- External gates: no authorized target device; current public-source audio canary fails; no permanent user-controlled signing key/credentials.
+- Roadmap lock SHA-256: `304FD58BF93FE7DF57FCD09C0BE5123DB5BD374455FABEB8CCB4B942A8F97584`.
 
-## Verified toolchain and pinned dependency baseline
+## Toolchain and pinned dependencies
 
-Verified 2026-08-19 against primary Android/Kotlin/GitHub release documentation:
+- JDK `17`; Android Gradle Plugin `9.2.1`; Gradle wrapper `9.4.1`.
+- AGP built-in Kotlin plus Compose plugin `2.4.10`; KSP `2.3.10`.
+- `compileSdk = 37`, `targetSdk = 37`, `minSdk = 23`.
+- Compose BOM `2026.06.00`; Activity Compose `1.13.0`; Navigation Compose `2.9.8`.
+- Core KTX `1.18.0`; Lifecycle/ViewModel `2.11.0`; coroutines `1.10.2`.
+- Room `2.8.4`; schema version `1`; export: `app/schemas/com.admin.mymusicplayer.data.database.MusicDatabase/1.json`.
+- Media3 `1.10.1`; OkHttp `5.2.1`.
+- NewPipe Extractor `v0.26.2` from JitPack; Gson `2.14.0`.
+- Coil Compose/network OkHttp `3.5.0`.
+- JUnit `4.13.2`; Truth `1.4.5`; Robolectric `4.16.1`; AndroidX Test Core `1.7.0`, rules `1.7.0`, ext JUnit `1.3.0`, Espresso `3.7.0`.
+- Lint currently reports newer Gradle/Core/Media3/coroutines/OkHttp versions. These are informational. Do not mix dependency upgrades into compatibility repair; update intentionally and rerun deterministic, live, and device acceptance suites.
 
-- Android Gradle Plugin `9.2.1`; Gradle `9.4.1`; JDK `17`
-- Kotlin/Compose compiler plugin `2.4.10`; AGP built-in Kotlin enabled; KSP `2.3.10` (KSP2)
-- compileSdk / targetSdk `37`; minSdk `23` pending physical-device API confirmation
-- Compose BOM `2026.06.00`; Activity Compose `1.13.0`; Navigation Compose `2.9.8`
-- Lifecycle/ViewModel `2.11.0`
-- Room `2.8.4`; database schema version planned as `1`; schema export directory `app/schemas`
-- Media3 `1.10.1`
-- NewPipe Extractor `v0.26.2` through JitPack
-- Kotlin serialization JSON version will be pinned in the Gradle catalog and recorded here once the first build resolves
-- Test versions will be pinned in the Gradle catalog and recorded here once the first build resolves
+Version references used for the baseline:
 
-Primary version references:
+- `https://developer.android.com/build/releases/agp-9-2-0-release-notes`
+- `https://kotlinlang.org/docs/releases.html`
+- `https://developer.android.com/develop/ui/compose/bom`
+- `https://developer.android.com/jetpack/androidx/releases/lifecycle`
+- `https://developer.android.com/jetpack/androidx/releases/room`
+- `https://developer.android.com/jetpack/androidx/releases/media3`
+- `https://kotlinlang.org/docs/ksp-quickstart.html`
+- `https://github.com/TeamNewPipe/NewPipeExtractor/releases/tag/v0.26.2`
+- `https://coil-kt.github.io/coil/compose/`
 
-- https://developer.android.com/build/releases/agp-9-2-0-release-notes
-- https://kotlinlang.org/docs/releases.html
-- https://developer.android.com/develop/ui/compose/bom
-- https://developer.android.com/jetpack/androidx/releases/lifecycle
-- https://developer.android.com/jetpack/androidx/releases/room
-- https://developer.android.com/jetpack/androidx/releases/media3
-- https://kotlinlang.org/docs/ksp-quickstart.html
-- https://github.com/TeamNewPipe/NewPipeExtractor/releases/tag/v0.26.2
+## Host environment
 
-## Environment
+- Windows workspace: `C:\Users\Admin\Documents\MyMusicPlayer`.
+- Android Studio: `C:\Program Files\Android\Android Studio`.
+- Android SDK: `C:\Users\Admin\AppData\Local\Android\Sdk`; installed platform `android-37.0`; Build Tools `36.0.0`.
+- ADB: `C:\Users\Admin\AppData\Local\Android\Sdk\platform-tools\adb.exe`; 2026-08-19 query returned no devices.
+- Codex sandbox cannot write normal Gradle/Android user homes. It uses ignored `.gradle-user-home`, `.android-user-home`, `.tools`, and `.kotlin` paths.
+- Robolectric's ignored offline SDK jar is `.tools/robolectric/android-all-instrumented-15-robolectric-13954326-i7.jar`; verified against published SHA-1 `d684f4e55d30465793a4a9e783f50266097b84df`. The Gradle task `prepareRobolectricDependencies` fetches it through Gradle only when absent.
+- Android's metrics warning about `C:\Users\Admin\.android\analytics.settings` is sandbox-only and non-fatal.
 
-- Host: Windows; Android Studio found at `C:\Program Files\Android\Android Studio`
-- SDK: `C:\Users\Admin\AppData\Local\Android\Sdk`
-- Installed platform: `android-37.0`; Build Tools `36.0.0`
-- `adb` is installed under the SDK but not initially on `PATH`; invoke `C:\Users\Admin\AppData\Local\Android\Sdk\platform-tools\adb.exe`
-- Target: Samsung Galaxy A36; Android/API, model build, and device acceptance status are not yet verified because no authorized device has been queried
+## Runtime dependency graph
 
-## Package boundaries
+- `MusicPlayerApplication` creates one `AppContainer`, initializes NewPipe without network I/O, restores only transient session state, starts automatic-backup observation, and owns the app-scoped `PlaybackClient`.
+- `AppContainer` constructs `MusicDatabase`, Room repositories, `RoomBackupStore`, `BackupManager`, bounded `DiagnosticLogger`, concrete NewPipe adapters, and playback queue controller.
+- Compose ViewModels receive real repositories/controllers from `AppRoot`. Fake providers/repository remain only as deterministic constructor defaults for unit tests and milestone fixtures.
+- Startup isolation: Room/library can open without network, source resolution, cache health, or successful playback-session restore. Corrupt transient state is cleared without destructive database recovery.
 
-- `app/src/main/java/com/admin/mymusicplayer/domain`: source-neutral models and verified pure shuffle/repeat/queue policies
-- `app/src/main/java/com/admin/mymusicplayer/search`: source-neutral `SearchProvider`, result/page contracts, deterministic `FakeSearchProvider`; real adapter pending Milestone 5
-- `app/src/main/java/com/admin/mymusicplayer/resolver`: source-neutral `AudioResolver`/`PlayableAudio` and deterministic `FakeAudioResolver`; real adapter pending Milestone 5
-- `app/src/main/java/com/admin/mymusicplayer/data/fake`: shared deterministic fake playlist store used only by the Milestone 2 UI
-- `.../data/database`, `.../data/dao`, `.../data/repository`: Room entities, DAOs, transactional library/session persistence
-- `.../data/backup`: versioned portable JSON backup/restore and validation
-- `.../data/diagnostics`: bounded local-only diagnostic events/bundles
-- `.../playback`: queue manager, persistent session repository, `PlayerController`, Media3 `PlaybackService`
-- `app/src/main/java/com/admin/mymusicplayer/ui`: Navigation Compose shell with Search, Playlists/detail, Queue, and Now Playing screens
-- `.../ui/search`, `.../ui/playlists`, `.../ui/queue`, `.../ui/player`: explicit immutable state/event ViewModels; settings pending Milestone 6
+## Package map
 
-No NewPipe type may cross into domain models, database entities, UI contracts/state, queue, shuffle, or repeat logic.
+- `domain/`: source-neutral `Track`, identity, availability, repeat/shuffle state, queue transformations, `ShufflePlanner`, `RepeatPolicy`.
+- `search/`, `resolver/`, `importer/`: source-neutral interfaces/contracts and deterministic test fakes.
+- `source/newpipe/`: the only concrete extractor boundary (`NewPipeRuntime`, search, audio resolution, playlist import, failure mapping).
+- `data/database/`, `data/dao/`: Room schema, projections, DAO queries/transactions.
+- `data/repository/`: `LibraryRepository`, `SessionRepository`, Room implementations, mappers, fake library fixture.
+- `playback/`: app-scoped MediaController client, persistent queue controller, `MediaSessionService`, cache-clear request bus.
+- `backup/`: portable models, validation/transactional restore store, SAF/automatic backup manager.
+- `diagnostics/`: bounded local NDJSON event log and export bundle.
+- `ui/search`, `ui/playlists`, `ui/queue`, `ui/player`, `ui/settings`: immutable state/event ViewModels and Compose screens.
 
-Only the application shell and domain package exist at Milestone 1; later package paths below are locked targets and must be updated to actual filenames as implemented.
+No NewPipe type may cross into domain models, Room entities, UI state/contracts, queue, shuffle, repeat, backup, or diagnostics records. No extracted media URL may become permanent state.
 
-## Database and source identity
+## Room schema version 1
 
-- Planned schema version `1`: `Track`, `Playlist`, `PlaylistEntry`, `PlaybackSession`, `QueueEntry`
-- Permanent track uniqueness: `(sourceType, sourceMediaId)`; titles are metadata, never identity
-- Playlist entries have stable manual positions and exact-source duplicate prevention per playlist
-- Playlist `revision` changes with structural edits
-- Bulk move/copy/remove is one transaction and preserves selected source order; Undo captures a reversible snapshot
-- Unreferenced Track rows are retained
-- No destructive production migration is allowed; every future migration needs schema export, migration test, counts, relationships, and relevant session validation
+Tables:
 
-## Queue, shuffle, and repeat
+- `tracks`: stable unique `(source_type, source_media_id)`, metadata, availability, creation time.
+- `playlists`: unique name, timestamps, monotonic structural `revision`.
+- `playlist_entries`: playlist/track relationship, manual `position`, uniqueness per exact source through track identity; cascade on playlist deletion.
+- `playback_sessions`: singleton session row; current index/position, shuffle state/permutation/cycle, repeat state/consumption, next queue-entry ID. Session updates use `@Upsert`; never `REPLACE`, which would cascade-delete queue rows.
+- `queue_entries`: persistent queue snapshot with stable queue-entry ID and position; independent from playlists.
 
-- The Room-backed active queue is a playback snapshot separate from playlists. Playlist edits never rewrite it implicitly.
-- Structural queue/session changes persist immediately; playback position checkpoints approximately every five seconds and on pause, item/service transition, and available shutdown hooks.
-- Restore queue order/current index/position/shuffle/repeat/repeat-once state after ordinary process death.
-- If transient session/cache restoration fails, reset only transient playback state and open the permanent library.
-- Shuffle is a full permutation, never random-next sampling. It preserves input and playlist order, excludes consumed items when enabled mid-cycle, honors an explicit tapped current item, and prevents equal cross-cycle boundaries for size > 1.
-- Repeat is per current queue entry. Repeat Once replays exactly once; Repeat Forever loops only that item; manual navigation/selection resets the new item to Play Once; queue entries are never duplicated for repeat.
+Rules:
 
-## Search and resolution
+- Structural library and session writes are transactional and immediate.
+- Playlist bulk move/copy/remove preserves selected source order and returns a reversible snapshot for Undo.
+- Playlist edits never rewrite an active queue.
+- Unreferenced track rows are retained.
+- No destructive migration fallback exists. Every version after 1 requires an explicit migration, exported schema, and migration/relationship/session tests.
 
-- `SearchProvider` returns source-neutral paginated results. Latest request wins by cancellation plus monotonically checked intent ID.
-- `AudioResolver` returns a transient source-neutral playable description. Latest playback intent wins by cancellation plus checked intent ID.
-- NewPipe calls and types remain only in concrete adapters. Permanent storage contains source identity and metadata, never extracted stream URLs.
-- Search/resolution failures must terminate visibly and remain independent from app/library startup.
-- Real canary and source availability are not yet verified.
-- Automation stops on DRM, authentication, bot/access-control, age/region, private/members-only, or anti-copying barriers; no circumvention is implemented.
+## Queue, shuffle, repeat, and session
 
-## Playback and session
+- Queue is a persistent playback snapshot, not a live playlist view.
+- Position checkpoints occur approximately every five seconds while playing and on pause, transition, task removal, and service teardown hooks.
+- Restore queue order/current item/position/shuffle permutation/cycle/repeat-once consumption after ordinary process death.
+- Shuffle is a complete permutation: preserves source order, excludes consumed entries when enabled mid-cycle, honors an explicit tapped item, and prevents equal cycle boundaries for size > 1.
+- Play Once uses normal progression. Repeat Once loops the current Media3 item until exactly one automatic replay is consumed. Repeat Forever loops only the current item. Manual selection/next/previous resets the newly selected item to Play Once. Repeat never duplicates queue entries.
 
-- Media3 `ExoPlayer` + `MediaSession` live in `MediaSessionService`; UI connects through a controller boundary.
-- Required state model: `IDLE`, `RESOLVING`, `BUFFERING`, `PLAYING`, `PAUSED`, `FAILED`.
-- Cache: Media3 `SimpleCache`, bounded LRU target `512 MiB`; Clear Cache is exposed in settings; cache failure cannot block database/library startup.
-- Current item is resolved and only the immediate next item is pre-resolved.
-- Transient failure has a bounded retry then one fresh resolve/resume attempt. Unavailable media remains stored, is visibly marked, and can be skipped without an infinite loop.
-- Audio focus uses Media3 audio attributes/handling. `AUDIO_BECOMING_NOISY` pauses playback to prevent speaker blast.
+## Search, import, and source failure behavior
+
+- `SearchViewModel` uses cancellation plus a monotonically checked request ID; stale completion cannot replace a newer request.
+- Direct public watch URLs and Android `ACTION_SEND text/plain` are accepted. Search results remain source-neutral.
+- Playlist import validates a public YouTube playlist URL, paginates with cancellation and a safety limit, preserves source order, and reports duplicate/inaccessible skips before a transactional create/add confirmation.
+- `NewPipeAudioResolver` fetches `StreamInfo`, selects the highest-bitrate nonblank URL from audio-only streams, and returns transient URI/MIME/expiry only.
+- Resolver work is lazy for current playback; only the immediate next entry is pre-resolved. `PlaybackClient.playNow` waits for the expected media ID before play so an old timeline cannot start.
+- Failures are finite and visible. 429/reCAPTCHA/sign-in-not-bot map to `ANTI_BOT_CHALLENGE`; age/region/private/paid map to `ACCESS_RESTRICTED`; unavailable/network/extractor compatibility remain distinct.
+- Hard stop: never add cookies, accounts, tokens, PoToken helpers, challenge solving, proxying, DRM workarounds, or other access-control circumvention.
+
+### Current live canary
+
+Command:
+
+```powershell
+.\gradlew.bat testDebugUnitTest `
+  --tests 'com.admin.mymusicplayer.source.newpipe.NewPipeLiveIntegrationTest' `
+  -DliveSourceTests=true
+```
+
+2026-08-19 result: failed. Public search returned results, but resolution threw `SourceFailure(EXTRACTOR_COMPATIBILITY)` caused by `IllegalStateException: No playable audio-only stream was returned`. NewPipe Extractor `v0.26.2` was the latest official release checked. Upstream-aligned Firefox ESR user agent, 30-second read timeout, and explicit HTTP 429 anti-bot mapping were applied; the canary still failed. This is an upstream/source availability gate, not permission to bypass access controls.
+
+Healthy canary behavior: exits 0 after a public search result resolves to a transient HTTPS audio stream; it does not build, mutate Room, repair code, sign, or release.
+
+## Media3 playback
+
+- `PlaybackService` extends `MediaSessionService` and owns `ExoPlayer`, `MediaSession`, audio focus/noisy handling, and notification/lock-screen/Bluetooth transport integration.
+- Full queue is represented as Media3 timeline items with stable queue-entry IDs.
+- A `ResolvingDataSource` converts internal `mymusicplayer://queue/<id>` URIs to fresh transient audio URIs. Cache keys use stable source identity.
+- `SimpleCache` uses `LeastRecentlyUsedCacheEvictor` capped at `512 MiB`; cache errors are ignored for upstream playback; Settings can clear cache.
+- Playback error path is bounded: retry once, then discard cached resolution and resolve once fresh. No infinite unavailable-item loop.
+- Android 13+ notification permission is requested at runtime; declining does not block in-app playback.
 
 ## Backup and diagnostics
 
-- Portable backup format version `1`: JSON containing `formatVersion`, creation timestamp, tracks, playlists, playlist entries, and minimal settings; transient playback session is excluded initially.
-- Full parse/version/uniqueness/relationship/count validation occurs before mutation; restore is transactional.
-- Android Storage Access Framework is used for manual backup/restore/location; successful automatic backups retain roughly ten rolling copies where the selected document-tree permissions allow it.
-- Diagnostics are bounded and local only. Bundle includes app/version, Git commit, device/API, NewPipe/Media3/database versions, recent events/errors, and last canary result.
+- Portable backup JSON `formatVersion = 1`, application ID, creation time, source-neutral tracks, playlists/ordered entries, minimal settings. Playback session/cache/temporary URLs are excluded.
+- Validation precedes mutation: format/app ID, timestamp, max bytes/counts/pages, required arrays, supported sources, unique identities/names, valid metadata/durations, and complete relationships.
+- Restore transaction replaces playlists/entries, reuses/upserts track identities, clears only transient playback state, and never performs partial mutation.
+- Manual backup/restore uses SAF. Optional document-tree automatic backups are debounced and retain about ten files where the provider supports document operations.
+- Platform cloud/device-transfer backup is excluded; portable JSON is the deliberate recovery mechanism.
+- Diagnostics retain at most 500 local events in app-private NDJSON. Export includes app/version/Git commit/device/API/NewPipe/Media3/Room provenance and recent sanitized events/errors. No telemetry or automatic upload.
 
 ## Commands
 
-Run from repository root in PowerShell:
+Normal local/Android Studio PowerShell:
 
 ```powershell
 .\gradlew.bat testDebugUnitTest
-.\gradlew.bat assembleDebug
-.\gradlew.bat connectedDebugAndroidTest
 .\gradlew.bat lintDebug
-.\gradlew.bat testDebugUnitTest connectedDebugAndroidTest lintDebug assembleRelease
+.\gradlew.bat compileDebugAndroidTestKotlin
+.\gradlew.bat connectedDebugAndroidTest
+.\gradlew.bat assembleDebug
+.\gradlew.bat assembleRelease
 ```
 
-Sandbox-only note: this Codex workspace redirects `GRADLE_USER_HOME` and debug signing state into ignored project-local directories because the sandbox cannot write the normal user homes. Normal local/Android Studio use should run the wrapper commands unchanged.
+Codex sandbox equivalent prefix:
 
-Device checks (when connected and authorized):
+```powershell
+$env:GRADLE_USER_HOME = "$PWD\.gradle-user-home"
+$env:ANDROID_USER_HOME = "$PWD\.android-user-home"
+& "$PWD\.tools\gradle-9.4.1\bin\gradle.bat" <tasks> --no-daemon
+```
+
+Device discovery:
 
 ```powershell
 & 'C:\Users\Admin\AppData\Local\Android\Sdk\platform-tools\adb.exe' devices -l
@@ -128,24 +169,39 @@ Device checks (when connected and authorized):
 & 'C:\Users\Admin\AppData\Local\Android\Sdk\platform-tools\adb.exe' shell getprop ro.build.version.sdk
 ```
 
-Canary command: not available until the isolated source adapter test is implemented. A healthy canary must exit without invoking a build or repair. Full network canary is manual/on-demand until v0.1 is verified; post-v0.1 scheduling is intentionally deferred.
+## Verified evidence
 
-## Signing and release
+- `testDebugUnitTest`: build success; 39 discovered, 38 passed, 0 failed/errors, 1 skipped guarded canary; 12 suites.
+- Covered: source identity, queue transformations, shuffle cycles/mid-cycle/boundaries, repeat policy/reducer, rapid stale search, fake bulk ordering/Undo, Room duplicate/reorder/move/copy/remove/Undo, queue/playlist separation, persistence recreation, corrupt-session isolation, Room backup validation/round-trip restore, URL parsing.
+- `lintDebug`: build success; 0 errors, 9 warnings (newer dependency/tool versions only).
+- `compileDebugAndroidTestKotlin`: build success. Tests: Room version-1 schema-open sentinel and Compose launch/navigation smoke test.
+- `assembleDebug`: build success; `app/build/outputs/apk/debug/app-debug.apk`.
+- `assembleRelease`: build success without signing environment; `app/build/outputs/apk/release/app-release-unsigned.apk`.
+- `connectedDebugAndroidTest`: not run; no authorized device/emulator.
+- Live canary: run separately and failed as documented above.
 
-- Release signing identity is not generated yet. Before device release, generate one permanent private JKS outside Git, keep a primary and separate offline backup, and provide credentials only to the local deterministic signing step.
-- Never commit keystores, passwords, generated local signing properties, or diagnostic/user data.
-- Do not tag or claim `v0.1.0` until the signed APK installs and every roadmap release condition, including update-over-old-data and clean-restore tests, passes on the target phone.
-- Release artifact must expose the source Git commit through BuildConfig/About/diagnostics.
+## Release signing
 
-## Known issues / blockers
+- Build config reads signing only when all four environment variables exist: `MY_MUSIC_PLAYER_KEYSTORE_PATH`, `MY_MUSIC_PLAYER_KEYSTORE_PASSWORD`, `MY_MUSIC_PLAYER_KEY_ALIAS`, `MY_MUSIC_PLAYER_KEY_PASSWORD`.
+- With none present, `assembleRelease` intentionally produces `app-release-unsigned.apk`.
+- Permanent JKS must be user-controlled, stored outside Git, and copied to a separate offline backup before first release. Never expose secrets to autonomous repair jobs or store them in repository files/logs.
+- The same JKS/application ID must sign every future update. Forward rollback uses known-good source with a higher version code; never change identity or destroy data compatibility.
 
-- Milestone 1 verified 2026-08-19: `testDebugUnitTest` passed 20 tests with 0 failures/errors; `assembleDebug` produced `app/build/outputs/apk/debug/app-debug.apk`. The APK is only a bootstrap shell until later milestones.
-- Milestone 2 verified 2026-08-19: deterministic four-screen Compose UI and playlist detail flow compile; rapid stale-search replacement, finite failure/retry, fake transactional order/duplicate behavior, and player reducer tests bring the unit total to 25/25. UI/device interaction remains pending physical-device verification.
-- Physical Samsung Galaxy A36 connection, API level, install, background playback, media controls, noisy-device behavior, update survival, and clean restore are unverified.
-- Network dependency resolution, NewPipe canary behavior, and legal/technical availability of individual public sources are unverified.
-- Release signing identity requires user-controlled secret backup before a release can be called complete.
+## Remaining release gates
+
+- Restore successful source audio resolution without crossing the hard-stop boundary; rerun canary.
+- Connect/authorize the Samsung Galaxy A36; record exact model/API/build.
+- Run connected tests and full manual device matrix in `RELEASE_CHECKLIST.md`: real search/playback, background/lock/Bluetooth/noisy/focus, long queue, process death, shuffle/repeat, playlist operations/Undo, backup/clean restore, update-over-old-data, diagnostics.
+- Create and offline-back up permanent user-controlled JKS; set environment credentials; build and verify signed release APK.
+- Install signed APK on target; confirm embedded Git commit; only then create annotated `v0.1.0` tag.
 - No remote repository is configured or published.
 
 ## Last compatibility repair
 
-- None. Initial implementation is in progress.
+2026-08-19 source adapter repair:
+
+- Replaced custom downloader user agent with the current Firefox ESR string used by upstream NewPipe.
+- Added upstream-equivalent 30-second read timeout and explicit HTTP 429 → `ReCaptchaException` mapping.
+- Removed an unjustified progressive-HTTP-only filter; resolver now evaluates all URL-backed audio-only streams.
+- Deterministic tests/build/lint remain green.
+- Live canary still returns no audio-only streams; source path stopped and external compatibility gate recorded.
