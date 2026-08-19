@@ -67,6 +67,7 @@ data class PlaybackSessionEntity(
     @ColumnInfo(name = "origin_playlist_revision") val originPlaylistRevision: Long?,
     @ColumnInfo(name = "shuffle_enabled") val shuffleEnabled: Boolean,
     @ColumnInfo(name = "current_queue_index") val currentQueueIndex: Int,
+    @ColumnInfo(name = "consumed_queue_entry_ids", defaultValue = "''") val consumedQueueEntryIds: String,
     @ColumnInfo(name = "current_position_ms") val currentPositionMs: Long,
     @ColumnInfo(name = "repeat_mode") val repeatMode: String,
     @ColumnInfo(name = "repeat_once_consumed") val repeatOnceConsumed: Boolean,

@@ -12,6 +12,7 @@ data class PersistentQueueItem(
 data class PersistentPlaybackState(
     val entries: List<PersistentQueueItem>,
     val currentIndex: Int,
+    val consumedQueueEntryIds: Set<Long>,
     val currentPositionMs: Long,
     val shuffleEnabled: Boolean,
     val repeatMode: RepeatMode,

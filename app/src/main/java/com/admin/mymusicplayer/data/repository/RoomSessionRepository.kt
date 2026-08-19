@@ -56,20 +56,23 @@ class RoomSessionRepository(
             PersistentQueueItem(nextEntryId++, ensureTrack(track))
         }
         val state = PersistentPlaybackState(
-            items,
-            currentIndex,
-            0,
-            shuffleEnabled,
-            RepeatMode.PLAY_ONCE,
-            false,
-            originPlaylistId,
-            originPlaylistRevision,
+            entries = items,
+            currentIndex = currentIndex,
+            consumedQueueEntryIds = setOf(items[currentIndex].queueEntryId),
+            currentPositionMs = 0,
+            shuffleEnabled = shuffleEnabled,
+            repeatMode = RepeatMode.PLAY_ONCE,
+            repeatOnceConsumed = false,
+            originPlaylistId = originPlaylistId,
+            originPlaylistRevision = originPlaylistRevision,
         )
         persistAll(state)
         state
     }
 
-    override suspend fun playNow(track: Track): PersistentPlaybackState = mutateQueue { current, item ->
+    override suspend fun playNow(track: Track): PersistentPlaybackState = mutateQueue(
+        resetConsumedToSelected = true,
+    ) { current, item ->
         if (current == null) {
             QueueSnapshot(listOf(item), 0)
         } else {
@@ -112,17 +115,23 @@ class RoomSessionRepository(
     override suspend fun setShuffleEnabled(enabled: Boolean): PersistentPlaybackState = database.withTransaction {
         val current = requireState()
         if (current.shuffleEnabled == enabled) return@withTransaction current
+        val currentEntryId = current.entries[current.currentIndex].queueEntryId
         val entries = if (enabled) {
             ShufflePlanner.enableMidCycle(
                 currentOrder = current.entries,
-                currentIndex = current.currentIndex,
+                currentIdentity = currentEntryId,
+                consumedIdentities = current.consumedQueueEntryIds,
                 identity = { it.queueEntryId },
                 random = random,
             )
         } else {
             current.entries
         }
-        val updated = current.copy(entries = entries, shuffleEnabled = enabled)
+        val updated = current.copy(
+            entries = entries,
+            currentIndex = entries.indexOfFirst { it.queueEntryId == currentEntryId },
+            shuffleEnabled = enabled,
+        )
         persistAll(updated)
         updated
     }
@@ -139,6 +148,7 @@ class RoomSessionRepository(
         val updated = current.copy(
             entries = entries,
             currentIndex = 0,
+            consumedQueueEntryIds = setOf(currentEntry.queueEntryId),
             currentPositionMs = 0,
             shuffleEnabled = true,
             repeatMode = RepeatMode.PLAY_ONCE,
@@ -160,6 +170,7 @@ class RoomSessionRepository(
         val updated = current.copy(
             entries = entries,
             currentIndex = 0,
+            consumedQueueEntryIds = setOf(entries.first().queueEntryId),
             currentPositionMs = 0,
             shuffleEnabled = true,
             repeatMode = RepeatMode.PLAY_ONCE,
@@ -179,6 +190,8 @@ class RoomSessionRepository(
         require(currentIndex in existing.entries.indices) { "currentIndex is outside the queue" }
         val updated = existing.copy(
             currentIndex = currentIndex,
+            consumedQueueEntryIds = existing.consumedQueueEntryIds +
+                existing.entries[currentIndex].queueEntryId,
             currentPositionMs = if (currentIndex == existing.currentIndex) existing.currentPositionMs else 0,
             shuffleEnabled = shuffleEnabled,
             repeatMode = repeatMode,
@@ -199,6 +212,7 @@ class RoomSessionRepository(
     suspend fun queueCount(): Int = dao.queueEntryCount()
 
     private fun mutateQueue(
+        resetConsumedToSelected: Boolean = false,
         transform: (PersistentPlaybackState?, PersistentQueueItem) -> QueueSnapshot<PersistentQueueItem>,
     ): suspend (Track) -> PersistentPlaybackState = { track ->
         database.withTransaction {
@@ -208,18 +222,26 @@ class RoomSessionRepository(
             val updated = current?.copy(
                 entries = snapshot.entries,
                 currentIndex = snapshot.currentIndex,
+                consumedQueueEntryIds = if (resetConsumedToSelected) {
+                    setOf(snapshot.entries[snapshot.currentIndex].queueEntryId)
+                } else {
+                    current.consumedQueueEntryIds
+                        .intersect(snapshot.entries.mapTo(mutableSetOf()) { it.queueEntryId }) +
+                        snapshot.entries[snapshot.currentIndex].queueEntryId
+                },
                 currentPositionMs = 0,
                 repeatMode = RepeatMode.PLAY_ONCE,
                 repeatOnceConsumed = false,
             ) ?: PersistentPlaybackState(
-                snapshot.entries,
-                snapshot.currentIndex,
-                0,
-                false,
-                RepeatMode.PLAY_ONCE,
-                false,
-                null,
-                null,
+                entries = snapshot.entries,
+                currentIndex = snapshot.currentIndex,
+                consumedQueueEntryIds = setOf(snapshot.entries[snapshot.currentIndex].queueEntryId),
+                currentPositionMs = 0,
+                shuffleEnabled = false,
+                repeatMode = RepeatMode.PLAY_ONCE,
+                repeatOnceConsumed = false,
+                originPlaylistId = null,
+                originPlaylistRevision = null,
             )
             persistAll(updated)
             updated
@@ -231,7 +253,13 @@ class RoomSessionRepository(
     ): PersistentPlaybackState = database.withTransaction {
         val current = requireState()
         val snapshot = transform(current)
-        val updated = current.copy(entries = snapshot.entries, currentIndex = snapshot.currentIndex)
+        val retainedIds = snapshot.entries.mapTo(mutableSetOf()) { it.queueEntryId }
+        val updated = current.copy(
+            entries = snapshot.entries,
+            currentIndex = snapshot.currentIndex,
+            consumedQueueEntryIds = current.consumedQueueEntryIds.intersect(retainedIds) +
+                snapshot.entries[snapshot.currentIndex].queueEntryId,
+        )
         persistAll(updated)
         updated
     }
@@ -252,6 +280,7 @@ class RoomSessionRepository(
     }
 
     private suspend fun upsertSessionOnly(state: PersistentPlaybackState) {
+        validateStateForPersistence(state)
         val existing = dao.getSession(SESSION_ID)
         val timestamp = now()
         dao.upsertSession(
@@ -261,6 +290,7 @@ class RoomSessionRepository(
                 originPlaylistRevision = state.originPlaylistRevision,
                 shuffleEnabled = state.shuffleEnabled,
                 currentQueueIndex = state.currentIndex,
+                consumedQueueEntryIds = encodeConsumedQueueEntryIds(state.consumedQueueEntryIds),
                 currentPositionMs = state.currentPositionMs,
                 repeatMode = state.repeatMode.name,
                 repeatOnceConsumed = state.repeatOnceConsumed,
@@ -268,6 +298,21 @@ class RoomSessionRepository(
                 updatedAtEpochMs = timestamp,
             ),
         )
+    }
+
+    private fun validateStateForPersistence(state: PersistentPlaybackState) {
+        require(state.entries.isNotEmpty() && state.currentIndex in state.entries.indices) {
+            "Playback state must identify a current queue entry"
+        }
+        val queueEntryIds = state.entries.map { it.queueEntryId }
+        require(queueEntryIds.toSet().size == queueEntryIds.size) { "Queue entry IDs must be unique" }
+        require(state.consumedQueueEntryIds.isNotEmpty()) { "Playback cycle must include the current entry" }
+        require(state.consumedQueueEntryIds.all { it in queueEntryIds }) {
+            "Consumed queue entry is outside the queue"
+        }
+        require(state.entries[state.currentIndex].queueEntryId in state.consumedQueueEntryIds) {
+            "Current queue entry must be part of the playback cycle history"
+        }
     }
 
     private suspend fun ensureTrack(track: Track): Track {
@@ -294,8 +339,13 @@ class RoomSessionRepository(
         queueRows: List<QueueItemRow>,
     ): PersistentPlaybackState? {
         val repeatMode = RepeatMode.entries.firstOrNull { it.name == session.repeatMode }
+        val consumedQueueEntryIds = decodeConsumedQueueEntryIds(session.consumedQueueEntryIds)
+        val queueEntryIds = queueRows.mapTo(mutableSetOf()) { it.entry.queueEntryId }
+        val currentQueueEntryId = queueRows.getOrNull(session.currentQueueIndex)?.entry?.queueEntryId
         val valid = queueRows.isNotEmpty() && session.currentQueueIndex in queueRows.indices &&
-            session.currentPositionMs >= 0 && repeatMode != null
+            session.currentPositionMs >= 0 && repeatMode != null && consumedQueueEntryIds != null &&
+            consumedQueueEntryIds.isNotEmpty() && consumedQueueEntryIds.all { it in queueEntryIds } &&
+            currentQueueEntryId in consumedQueueEntryIds
         if (!valid) return null
         return PersistentPlaybackState(
             entries = queueRows.map { row ->
@@ -315,6 +365,7 @@ class RoomSessionRepository(
                 )
             },
             currentIndex = session.currentQueueIndex,
+            consumedQueueEntryIds = requireNotNull(consumedQueueEntryIds),
             currentPositionMs = session.currentPositionMs,
             shuffleEnabled = session.shuffleEnabled,
             repeatMode = requireNotNull(repeatMode),
@@ -326,5 +377,14 @@ class RoomSessionRepository(
 
     private companion object {
         const val SESSION_ID = 1L
+
+        fun encodeConsumedQueueEntryIds(ids: Set<Long>): String = ids.sorted().joinToString(",")
+
+        fun decodeConsumedQueueEntryIds(value: String): Set<Long>? {
+            if (value.isBlank()) return emptySet()
+            val decoded = value.split(',').map { it.toLongOrNull() ?: return null }
+            if (decoded.any { it <= 0 } || decoded.distinct().size != decoded.size) return null
+            return decoded.toSet()
+        }
     }
 }

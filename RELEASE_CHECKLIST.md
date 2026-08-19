@@ -8,14 +8,14 @@ Recorded 2026-08-19. A checked item has direct local evidence. Device/source/sig
 
 - [x] Permanent application ID is `com.admin.mymusicplayer`.
 - [x] Roadmap/source-of-truth files exist and the copied roadmap SHA-256 matches `304FD58BF93FE7DF57FCD09C0BE5123DB5BD374455FABEB8CCB4B942A8F97584`.
-- [x] `testDebugUnitTest`: 39 discovered, 38 passed, 0 failed/errors, one intentionally skipped live canary.
-- [x] Shuffle permutation, mid-cycle enable, explicit selection, reshuffle, and cross-cycle boundary tests pass.
+- [x] `testDebugUnitTest`: 45 discovered, 44 passed, 0 failed/errors, one intentionally skipped live canary.
+- [x] Shuffle permutation, actual-consumption eligibility, exact Song-2-of-3 selection regression, Previous behavior, process-recreation, reshuffle, and cross-cycle boundary tests pass.
 - [x] Repeat Once/Forever/manual-navigation policy and player reducer tests pass.
-- [x] Room exact-source duplicate, ordering, transactional copy/move/remove/reorder, Undo, queue separation, session recreation, and corrupt-transient-state isolation tests pass.
+- [x] Room exact-source duplicate, ordering, transactional copy/move/remove/reorder, Undo, queue separation, consumed-history recreation, corrupt-transient-state isolation, and schema `1 → 2` entity/relationship/session migration tests pass.
 - [x] Backup validation and transactional export/restore tests pass.
 - [x] Search latest-request-wins and finite failure/retry tests pass.
-- [x] `lintDebug`: 0 errors; nine pinned-dependency/tool update notices.
-- [x] `compileDebugAndroidTestKotlin`: Room schema and Compose launch/navigation tests compile.
+- [x] Latest offline `lintDebug`: 0 issues; an earlier network-aware run reported nine pinned-dependency/tool update notices only.
+- [x] `compileDebugAndroidTestKotlin`: Room schema-2 migration validation and Compose launch/navigation tests compile.
 - [x] `assembleDebug`: debug APK produced.
 - [x] `assembleRelease`: unsigned release APK produced when signing environment is absent.
 - [x] Git commit is exposed in BuildConfig, Settings, and diagnostic export.

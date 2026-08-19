@@ -10,6 +10,7 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
+import kotlin.random.Random
 
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [35])
@@ -58,6 +59,10 @@ class RoomSessionRepositoryTest : RoomRepositoryTestSupport() {
         assertThat(restored.currentIndex).isEqualTo(2)
         assertThat(restored.currentPositionMs).isEqualTo(42_500)
         assertThat(restored.shuffleEnabled).isTrue()
+        assertThat(restored.consumedQueueEntryIds).containsExactly(
+            restored.entries[1].queueEntryId,
+            restored.entries[2].queueEntryId,
+        )
         assertThat(restored.repeatMode).isEqualTo(RepeatMode.REPEAT_ONCE)
         assertThat(restored.repeatOnceConsumed).isTrue()
     }
@@ -93,12 +98,101 @@ class RoomSessionRepositoryTest : RoomRepositoryTestSupport() {
 
     @Test
     fun enablingShuffleMidCycleKeepsConsumedPrefixAndUsesExactCoverage() = runTest {
-        session.replaceQueue(listOf(track("a"), track("b"), track("c"), track("d")), currentIndex = 1)
+        session.replaceQueue(listOf(track("a"), track("b"), track("c"), track("d")), currentIndex = 0)
+        session.updatePlaybackStructure(
+            currentIndex = 1,
+            shuffleEnabled = false,
+            repeatMode = RepeatMode.PLAY_ONCE,
+            repeatOnceConsumed = false,
+        )
 
         val shuffled = session.setShuffleEnabled(true)
 
         assertThat(shuffled.entries.take(2).map { it.track.sourceMediaId }).containsExactly("a", "b").inOrder()
         assertThat(shuffled.entries.map { it.track.sourceMediaId }).containsExactly("a", "b", "c", "d")
+        assertThat(shuffled.currentIndex).isEqualTo(1)
+    }
+
+    @Test
+    fun explicitlySelectingSecondTrackDoesNotConsumeFirstWhenShuffleIsEnabled() = runTest {
+        val deterministicSession = RoomSessionRepository(database, random = Random(7))
+        deterministicSession.replaceQueue(
+            listOf(track("song-1"), track("song-2"), track("song-3")),
+            currentIndex = 1,
+        )
+
+        val shuffled = deterministicSession.setShuffleEnabled(true)
+
+        assertThat(shuffled.entries[shuffled.currentIndex].track.sourceMediaId).isEqualTo("song-2")
+        assertThat(shuffled.entries.drop(shuffled.currentIndex + 1).map { it.track.sourceMediaId })
+            .containsExactly("song-1", "song-3")
+    }
+
+    @Test
+    fun explicitSelectionEligibilitySurvivesRepositoryRecreationBeforeShuffle() = runTest {
+        session.replaceQueue(
+            listOf(track("song-1"), track("song-2"), track("song-3")),
+            currentIndex = 1,
+        )
+        val recreated = RoomSessionRepository(database, now = { 9_999L }, random = Random(11))
+
+        val shuffled = recreated.setShuffleEnabled(true)
+
+        assertThat(shuffled.entries[shuffled.currentIndex].track.sourceMediaId).isEqualTo("song-2")
+        assertThat(shuffled.entries.drop(shuffled.currentIndex + 1).map { it.track.sourceMediaId })
+            .containsExactly("song-1", "song-3")
+    }
+
+    @Test
+    fun shuffledConsumptionAndRemainingOrderSurviveRepositoryRecreation() = runTest {
+        val deterministicSession = RoomSessionRepository(database, random = Random(19))
+        deterministicSession.replaceQueue(
+            listOf(track("song-1"), track("song-2"), track("song-3")),
+            currentIndex = 1,
+        )
+        val shuffled = deterministicSession.setShuffleEnabled(true)
+        deterministicSession.updatePlaybackStructure(
+            currentIndex = shuffled.currentIndex + 1,
+            shuffleEnabled = true,
+            repeatMode = RepeatMode.PLAY_ONCE,
+            repeatOnceConsumed = false,
+        )
+
+        val restored = requireNotNull(
+            RoomSessionRepository(database, now = { 10_000L }).restoreOrResetTransient(),
+        )
+
+        assertThat(restored.entries.map { it.track.sourceMediaId })
+            .containsExactlyElementsIn(shuffled.entries.map { it.track.sourceMediaId }).inOrder()
+        assertThat(restored.currentIndex).isEqualTo(1)
+        assertThat(restored.consumedQueueEntryIds).containsExactly(
+            restored.entries[0].queueEntryId,
+            restored.entries[1].queueEntryId,
+        )
+        assertThat(restored.entries.drop(restored.currentIndex + 1)).hasSize(1)
+        assertThat(restored.entries.map { it.track.sourceMediaId }).contains("song-1")
+    }
+
+    @Test
+    fun enablingShuffleAfterPreviousKeepsConsumedItemBehindCurrent() = runTest {
+        session.replaceQueue(listOf(track("song-1"), track("song-2"), track("song-3")), currentIndex = 0)
+        session.updatePlaybackStructure(
+            currentIndex = 1,
+            shuffleEnabled = false,
+            repeatMode = RepeatMode.PLAY_ONCE,
+            repeatOnceConsumed = false,
+        )
+        session.updatePlaybackStructure(
+            currentIndex = 0,
+            shuffleEnabled = false,
+            repeatMode = RepeatMode.PLAY_ONCE,
+            repeatOnceConsumed = false,
+        )
+
+        val shuffled = session.setShuffleEnabled(true)
+
+        assertThat(shuffled.entries.map { it.track.sourceMediaId })
+            .containsExactly("song-2", "song-1", "song-3").inOrder()
         assertThat(shuffled.currentIndex).isEqualTo(1)
     }
 

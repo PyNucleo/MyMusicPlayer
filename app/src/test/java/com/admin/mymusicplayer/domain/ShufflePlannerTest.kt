@@ -38,11 +38,32 @@ class ShufflePlannerTest {
     @Test
     fun midCycle_preservesConsumedAndCurrent_andShufflesOnlyUnconsumed() {
         val input = listOf("A", "B", "C", "D", "E", "F", "G")
-        val result = ShufflePlanner.enableMidCycle(input, 2, { it }, Random(44))
+        val result = ShufflePlanner.enableMidCycle(
+            currentOrder = input,
+            currentIdentity = "C",
+            consumedIdentities = setOf("A", "B", "C"),
+            identity = { it },
+            random = Random(44),
+        )
 
         assertThat(result.take(3)).containsExactly("A", "B", "C").inOrder()
         assertThat(result.drop(3)).containsExactly("D", "E", "F", "G")
         assertThat(input).containsExactly("A", "B", "C", "D", "E", "F", "G").inOrder()
+    }
+
+    @Test
+    fun midCycle_usesActualConsumptionInsteadOfEntriesBeforeCurrentIndex() {
+        val result = ShufflePlanner.enableMidCycle(
+            currentOrder = listOf("Song 1", "Song 2", "Song 3"),
+            currentIdentity = "Song 2",
+            consumedIdentities = setOf("Song 2"),
+            identity = { it },
+            random = Random(7),
+        )
+
+        assertThat(result.first()).isEqualTo("Song 2")
+        assertThat(result.drop(1)).containsExactly("Song 1", "Song 3")
+        assertThat(result.distinct()).hasSize(3)
     }
 
     @Test

@@ -24,7 +24,7 @@ class AppContainer(context: Context) {
         context.applicationContext,
         MusicDatabase::class.java,
         MusicDatabase.FILE_NAME,
-    ).build()
+    ).addMigrations(MusicDatabase.MIGRATION_1_2).build()
 
     val libraryRepository: LibraryRepository = RoomLibraryRepository(database)
     val sessionRepository: SessionRepository = RoomSessionRepository(database)

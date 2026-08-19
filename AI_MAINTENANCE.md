@@ -9,9 +9,9 @@ Machine-oriented implementation truth. Read `PROJECT_CONTEXT_AND_ROADMAP.md` and
 - Version: `0.1.0`, `versionCode = 1`.
 - Implementation checkpoint: `c8ca48b` (`Complete persistent playback and data safety features`).
 - No `v0.1.0` tag exists. Do not create it until every item in `RELEASE_CHECKLIST.md` passes.
-- Private repository: `https://github.com/PyNucleo/MyMusicPlayer`; private debug prerelease `device-test-0.1.0-debug-0fe5538` targets `0fe5538` and contains only `app-debug.apk`.
-- Local deterministic suite: 39 discovered, 38 passed, 0 failed/errors, 1 skipped guarded live canary.
-- Debug lint: 0 errors, 9 dependency-version availability warnings.
+- Private repository: `https://github.com/PyNucleo/MyMusicPlayer`. Private debug prereleases `device-test-0.1.0-debug-0fe5538` and `device-test-0.1.0-newpipe-5da9662` remain available; each contains only `app-debug.apk`. The NewPipe prerelease tag resolves exactly to `5da96621f01351bddcb09445763200936bc322ec`; its 18,925,420-byte asset has SHA-256 `1C2E3E0B4476F5E9FEFE14F93AA63F389A04F85C78E15B327825E805A738AE46` and embeds Git SHA `5da96621f013`.
+- Local deterministic suite: 45 discovered, 44 passed, 0 failed/errors, 1 skipped guarded live canary.
+- Latest clean offline `lintDebug`: 0 issues, errors, or warnings. An earlier network-aware run reported 9 dependency-version availability notices only.
 - `compileDebugAndroidTestKotlin`, `assembleDebug`, and unsigned `assembleRelease` pass.
 - External gates: a Samsung Galaxy A36 debug-build smoke test passed for install, launch, navigation, playlist/queue interaction, and graceful visible source failure; the host public-source audio canary passes after the local NewPipe `v0.26.5` update, but the rebuilt debug APK has not been retested on-device; exact device/API/build and connected-test evidence are not recorded; no permanent user-controlled signing key/credentials exist.
 - Roadmap lock SHA-256: `304FD58BF93FE7DF57FCD09C0BE5123DB5BD374455FABEB8CCB4B942A8F97584`.
@@ -23,7 +23,7 @@ Machine-oriented implementation truth. Read `PROJECT_CONTEXT_AND_ROADMAP.md` and
 - `compileSdk = 37`, `targetSdk = 37`, `minSdk = 23`.
 - Compose BOM `2026.06.00`; Activity Compose `1.13.0`; Navigation Compose `2.9.8`.
 - Core KTX `1.18.0`; Lifecycle/ViewModel `2.11.0`; coroutines `1.10.2`.
-- Room `2.8.4`; schema version `1`; export: `app/schemas/com.admin.mymusicplayer.data.database.MusicDatabase/1.json`.
+- Room `2.8.4`; schema version `2`; exports: `app/schemas/com.admin.mymusicplayer.data.database.MusicDatabase/{1,2}.json`.
 - Media3 `1.10.1`; OkHttp `5.2.1`.
 - NewPipe Extractor `v0.26.5` from JitPack; Gson `2.14.0`.
 - Coil Compose/network OkHttp `3.5.0`.
@@ -75,14 +75,14 @@ Version references used for the baseline:
 
 No NewPipe type may cross into domain models, Room entities, UI state/contracts, queue, shuffle, repeat, backup, or diagnostics records. No extracted media URL may become permanent state.
 
-## Room schema version 1
+## Room schema version 2
 
 Tables:
 
 - `tracks`: stable unique `(source_type, source_media_id)`, metadata, availability, creation time.
 - `playlists`: unique name, timestamps, monotonic structural `revision`.
 - `playlist_entries`: playlist/track relationship, manual `position`, uniqueness per exact source through track identity; cascade on playlist deletion.
-- `playback_sessions`: singleton session row; current index/position, shuffle state/permutation/cycle, repeat state/consumption, next queue-entry ID. Session updates use `@Upsert`; never `REPLACE`, which would cascade-delete queue rows.
+- `playback_sessions`: singleton session row; current index/position, shuffle state/permutation/cycle, persisted comma-delimited set of actually consumed stable queue-entry IDs, repeat state/consumption, next queue-entry ID. Session updates use `@Upsert`; never `REPLACE`, which would cascade-delete queue rows.
 - `queue_entries`: persistent queue snapshot with stable queue-entry ID and position; independent from playlists.
 
 Rules:
@@ -91,14 +91,14 @@ Rules:
 - Playlist bulk move/copy/remove preserves selected source order and returns a reversible snapshot for Undo.
 - Playlist edits never rewrite an active queue.
 - Unreferenced track rows are retained.
-- No destructive migration fallback exists. Every version after 1 requires an explicit migration, exported schema, and migration/relationship/session tests.
+- No destructive migration fallback exists. Migration `1→2` adds `playback_sessions.consumed_queue_entry_ids`, preserves every existing entity and relationship, and conservatively seeds the migrated cycle with only the current queue entry because version 1 cannot prove any earlier consumption. Every later version requires an explicit migration, exported schema, and migration/relationship/session tests.
 
 ## Queue, shuffle, repeat, and session
 
 - Queue is a persistent playback snapshot, not a live playlist view.
 - Position checkpoints occur approximately every five seconds while playing and on pause, transition, task removal, and service teardown hooks.
-- Restore queue order/current item/position/shuffle permutation/cycle/repeat-once consumption after ordinary process death.
-- Shuffle is a complete permutation: preserves source order, excludes consumed entries when enabled mid-cycle, honors an explicit tapped item, and prevents equal cycle boundaries for size > 1.
+- Restore queue order/current item/position/shuffle permutation/cycle/actually consumed queue-entry IDs/repeat-once consumption after ordinary process death.
+- Shuffle is a complete permutation: playlist order remains untouched; eligibility is derived from persisted queue entries actually visited in the current cycle, never from their position before the current index; enabling mid-cycle keeps consumed entries plus current before the cursor and shuffles every other snapshot entry exactly once; explicit selection starts history at the selected entry; a new/explicitly reshuffled cycle resets history to its first/current entry; cross-cycle boundaries differ for size > 1.
 - Play Once uses normal progression. Repeat Once loops the current Media3 item until exactly one automatic replay is consumed. Repeat Forever loops only the current item. Manual selection/next/previous resets the newly selected item to Play Once. Repeat never duplicates queue entries.
 
 ## Search, import, and source failure behavior
@@ -187,9 +187,9 @@ Device discovery:
 
 ## Verified evidence
 
-- `testDebugUnitTest`: build success; 39 discovered, 38 passed, 0 failed/errors, 1 skipped guarded canary; 12 suites.
-- Covered: source identity, queue transformations, shuffle cycles/mid-cycle/boundaries, repeat policy/reducer, rapid stale search, fake bulk ordering/Undo, Room duplicate/reorder/move/copy/remove/Undo, queue/playlist separation, persistence recreation, corrupt-session isolation, Room backup validation/round-trip restore, URL parsing.
-- `lintDebug`: build success; 0 errors, 9 warnings (newer dependency/tool versions only).
+- `testDebugUnitTest`: build success; 45 discovered, 44 passed, 0 failed/errors, 1 skipped guarded canary; 13 suites.
+- Covered: source identity, queue transformations, shuffle cycles/mid-cycle/explicit-second-track eligibility/Previous/boundaries, repeat policy/reducer, rapid stale search, fake bulk ordering/Undo, Room duplicate/reorder/move/copy/remove/Undo, queue/playlist separation, consumed-history recreation, corrupt-session isolation, host-executed Room `1→2` entity/relationship/session migration, Room backup validation/round-trip restore, URL parsing.
+- `lintDebug`: latest clean offline build success with 0 issues, errors, or warnings; an earlier network-aware run reported 9 newer dependency/tool version notices only.
 - `compileDebugAndroidTestKotlin`: build success. Tests: Room version-1 schema-open sentinel and Compose launch/navigation smoke test.
 - `assembleDebug`: build success; `app/build/outputs/apk/debug/app-debug.apk`.
 - `assembleRelease`: build success without signing environment; `app/build/outputs/apk/release/app-release-unsigned.apk`.
@@ -210,7 +210,7 @@ Device discovery:
 - Run connected tests and the remaining full manual device matrix in `RELEASE_CHECKLIST.md`: successful real search/playback, background/lock/Bluetooth/noisy/focus, long queue, process death, shuffle/repeat, complete playlist operations/Undo, backup/clean restore, update-over-old-data, and diagnostics.
 - Create and offline-back up permanent user-controlled JKS; set environment credentials; build and verify signed release APK.
 - Install signed APK on target; confirm embedded Git commit; only then create annotated `v0.1.0` tag.
-- `origin` is the private `PyNucleo/MyMusicPlayer` repository. The existing debug prerelease is for device testing only; it is not a signed release or a last-known-good `v0.1.0` release.
+- `origin` is the private `PyNucleo/MyMusicPlayer` repository. The existing debug prereleases are for device testing only; neither is a signed release or a last-known-good `v0.1.0` release.
 
 ## Last compatibility repair
 
@@ -221,5 +221,17 @@ Device discovery:
 - Updated only the pinned extractor dependency and reported BuildConfig/diagnostic version from `v0.26.2` to `v0.26.5`; NewPipe adapter logic is unchanged.
 - Did not add authentication, cookies/tokens, a PoToken provider, challenge solving, proxying, DRM handling, or any access-control bypass.
 - The same guarded live canary passes on `v0.26.5`.
-- `testDebugUnitTest`, `lintDebug`, `compileDebugAndroidTestKotlin`, and `assembleDebug` pass; 39 tests discovered, 38 passed, 1 guarded live canary skipped in the deterministic run, 0 failures/errors, and lint remains at 0 errors/9 update notices.
+- At commit `5da96621f01351bddcb09445763200936bc322ec`, the forced guarded live canary passed 1/1 with no skip, failure, or error. A subsequent clean offline run passed `testDebugUnitTest`, `lintDebug`, `compileDebugAndroidTestKotlin`, and `assembleDebug`: 39 deterministic tests discovered, 38 passed, 1 guarded live canary skipped, 0 failures/errors, and lint reported 0 issues.
+- Private prerelease `device-test-0.1.0-newpipe-5da9662` is tagged at that exact commit and contains exactly one asset, the rebuilt `app-debug.apk`; GitHub's recorded digest and an independently downloaded copy both match local SHA-256 `1C2E3E0B4476F5E9FEFE14F93AA63F389A04F85C78E15B327825E805A738AE46`.
 - Commit compatibility changes before rebuilding device-test artifacts; never release an APK built from a dirty tree because its embedded Git SHA would not identify the complete source.
+
+## Last P0 shuffle repair
+
+2026-08-19 persistent shuffle-eligibility repair:
+
+- Root cause: `ShufflePlanner.enableMidCycle` treated `currentOrder.take(currentIndex + 1)` as consumed history. An explicit tap on Song 2 therefore falsely consumed Song 1 solely because Song 1 preceded the current index.
+- `PersistentPlaybackState` now carries the stable queue-entry IDs actually visited in the current cycle. Playback transitions add the reached entry; new queues and explicit selections start with only the selected/current entry; reshuffle/new-cycle state resets consistently; queue mutations retain only history IDs still present.
+- Enabling shuffle builds the consumed/current prefix from that persisted set, places the current entry last in the prefix for normal Previous behavior, and shuffles every other queue-snapshot entry exactly once. Playlist order and repeat behavior are unchanged.
+- Room schema `2` and explicit migration `1→2` preserve tracks, playlists, playlist relationships, queue rows, and session fields. The migration seeds only the current queue entry as consumed, favoring a possible replay over silently skipping an unplayed track. No destructive fallback exists.
+- Deterministic regressions cover the exact three-track Song 2 selection, repository recreation before shuffle, consumption/restoration after shuffle, Previous behavior, exact coverage, no duplicates, and prior mid-cycle behavior. The host migration test validates entity counts, playlist/queue relationships, session fields, migrated history, and foreign keys; the Android migration test additionally uses Room schema validation and compiles successfully.
+- Final verification passed `testDebugUnitTest`, `lintDebug`, `compileDebugAndroidTestKotlin`, and `assembleDebug`: 45 tests discovered, 44 passed, 1 guarded live canary skipped, 0 failures/errors, and 0 lint issues.

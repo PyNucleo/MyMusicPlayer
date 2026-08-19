@@ -22,15 +22,22 @@ object ShufflePlanner {
 
     fun <T, K> enableMidCycle(
         currentOrder: List<T>,
-        currentIndex: Int,
+        currentIdentity: K,
+        consumedIdentities: Set<K>,
         identity: (T) -> K,
         random: Random = Random.Default,
     ): List<T> {
         if (currentOrder.isEmpty()) return emptyList()
-        require(currentIndex in currentOrder.indices) { "currentIndex is outside the queue" }
         requireUnique(currentOrder, identity)
-        val consumedAndCurrent = currentOrder.take(currentIndex + 1)
-        val unconsumed = currentOrder.drop(currentIndex + 1)
+        val knownIdentities = currentOrder.map(identity).toSet()
+        require(currentIdentity in knownIdentities) { "current item is outside the queue" }
+        require(consumedIdentities.all { it in knownIdentities }) { "consumed item is outside the queue" }
+        val consumedIncludingCurrent = consumedIdentities + currentIdentity
+        val consumedAndCurrent = currentOrder.filter { item ->
+            val itemIdentity = identity(item)
+            itemIdentity in consumedIncludingCurrent && itemIdentity != currentIdentity
+        } + currentOrder.single { identity(it) == currentIdentity }
+        val unconsumed = currentOrder.filterNot { identity(it) in consumedIncludingCurrent }
         return consumedAndCurrent + planCycle(unconsumed, identity, random = random)
     }
 
@@ -77,4 +84,3 @@ object ShufflePlanner {
         return result.toList()
     }
 }
-

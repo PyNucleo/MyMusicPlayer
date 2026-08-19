@@ -33,7 +33,7 @@ android {
         buildConfigField("String", "GIT_COMMIT", "\"${gitCommit()}\"")
         buildConfigField("String", "NEWPIPE_VERSION", "\"0.26.5\"")
         buildConfigField("String", "MEDIA3_VERSION", "\"1.10.1\"")
-        buildConfigField("int", "DATABASE_VERSION", "1")
+        buildConfigField("int", "DATABASE_VERSION", "2")
     }
 
     buildFeatures {
