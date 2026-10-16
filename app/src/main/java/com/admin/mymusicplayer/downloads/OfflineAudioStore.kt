@@ -44,6 +44,34 @@ class OfflineAudioStore(private val directory: File) {
     }
 
     @Synchronized
+    fun recordPending(track: Track) {
+        partialFile(track.sourceIdentity) // Ensure the private directory exists before writing metadata.
+        val pending = pendingFile(track.sourceIdentity)
+        if (readPending().any { it.sourceIdentity == track.sourceIdentity }) return
+        val temporary = File("${pending.path}.tmp")
+        try {
+            temporary.outputStream().use { output ->
+                output.write(gson.toJson(track).toByteArray(Charsets.UTF_8))
+                output.fd.sync()
+            }
+            if (pending.exists() && !pending.delete()) throw IOException("Cannot save download progress")
+            if (!temporary.renameTo(pending)) throw IOException("Cannot save download progress")
+        } finally {
+            temporary.delete()
+        }
+    }
+
+    fun readPending(): List<Track> = directory.listFiles().orEmpty()
+        .filter { it.extension == "pending" }
+        .mapNotNull { pending ->
+            runCatching {
+                val track = gson.fromJson(pending.readText(), Track::class.java).copy()
+                require(pending.nameWithoutExtension == key(track.sourceIdentity))
+                track.takeIf { find(track) == null }
+            }.getOrNull()
+        }
+
+    @Synchronized
     fun commit(track: Track, partial: File, mimeType: String?): SavedAudio {
         require(partial == partialFile(track.sourceIdentity) && partial.length() > 0)
         val identity = track.sourceIdentity
@@ -64,6 +92,8 @@ class OfflineAudioStore(private val directory: File) {
                 audioFile(identity).delete()
                 throw IOException("Cannot save download metadata")
             }
+            pendingFile(identity).delete()
+            File("${partial.path}.resume").delete()
         } finally {
             metadata.delete()
         }
@@ -78,17 +108,24 @@ class OfflineAudioStore(private val directory: File) {
         val audio = audioFile(identity)
         if (audio.exists() && !audio.delete()) throw IOException("Cannot remove downloaded audio")
         File(directory, "${key(identity)}.part").delete()
+        File(directory, "${key(identity)}.part.resume").delete()
+        pendingFile(identity).delete()
     }
 
     fun cleanInterruptedFiles() {
+        val pendingKeys = readPending().mapTo(mutableSetOf()) { key(it.sourceIdentity) }
         directory.listFiles().orEmpty().filter {
-            it.extension == "part" || it.name.endsWith(".tmp") ||
+            it.name.endsWith(".tmp") ||
+                (it.extension == "part" && it.nameWithoutExtension !in pendingKeys) ||
+                (it.name.endsWith(".part.resume") && it.name.removeSuffix(".part.resume") !in pendingKeys) ||
+                (it.extension == "pending" && it.nameWithoutExtension !in pendingKeys) ||
                 (it.extension == "audio" && !File(directory, "${it.nameWithoutExtension}.json").isFile)
         }.forEach { it.delete() }
     }
 
     private fun audioFile(identity: SourceIdentity) = File(directory, "${key(identity)}.audio")
     private fun metadataFile(identity: SourceIdentity) = File(directory, "${key(identity)}.json")
+    private fun pendingFile(identity: SourceIdentity) = File(directory, "${key(identity)}.pending")
 
     private fun key(identity: SourceIdentity): String = MessageDigest.getInstance("SHA-256")
         .digest("${identity.sourceType.name}:${identity.sourceMediaId}".toByteArray(Charsets.UTF_8))

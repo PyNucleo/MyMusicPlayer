@@ -8,7 +8,7 @@ Recorded 2026-08-19. A checked item has direct local evidence. Device/source/sig
 
 - [x] Permanent application ID is `com.admin.mymusicplayer`.
 - [x] Roadmap/source-of-truth files exist and the copied roadmap SHA-256 matches `304FD58BF93FE7DF57FCD09C0BE5123DB5BD374455FABEB8CCB4B942A8F97584`.
-- [x] `testDebugUnitTest`: 55 discovered, 54 passed, 0 failed/errors, one intentionally skipped live canary (includes 10 download/offline tests).
+- [x] `testDebugUnitTest`: 69 discovered, 68 passed, 0 failed/errors, one intentionally skipped live canary (includes 24 download/offline/resume tests).
 - [x] Shuffle permutation, actual-consumption eligibility, exact Song-2-of-3 selection regression, Previous behavior, process-recreation, reshuffle, and cross-cycle boundary tests pass.
 - [x] Repeat Once/Forever/manual-navigation policy and player reducer tests pass.
 - [x] Room exact-source duplicate, ordering, transactional copy/move/remove/reorder, Undo, queue separation, consumed-history recreation, corrupt-transient-state isolation, and schema `1 → 2` entity/relationship/session migration tests pass.
@@ -67,7 +67,8 @@ Required tests:
 - [ ] Clearing playback cache does not damage library/session and playback re-resolves safely.
 - [ ] Download audio, enable airplane mode, restart the app, and verify Downloads Play plus normal playlist/queue playback and seeking.
 - [ ] Clear playback cache while offline; completed downloads still play. Remove a download; playlists and queue remain intact.
-- [ ] Cancel/interruption, retry, network loss, full storage, and source restrictions leave no playable partial download or indefinite spinner.
+- [ ] Brief network loss retries/resumes with retained bytes; a longer loss pauses with Resume. Restart the app and resume pending progress; no partial download is playable.
+- [ ] Cancel during retry backoff removes pending progress and prevents a late retry. Full storage and source restrictions stop without automatic retry loops.
 - [ ] Source/network failure remains finite and library stays available offline.
 - [ ] Manual backup, library mutation, previewed validated restore, and exact order recovery work.
 - [ ] Automatic backup location permission survives restart and rolling retention remains about ten files.

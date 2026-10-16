@@ -57,4 +57,46 @@ class OfflineAudioStoreTest {
         })
         assertThat(resolver.resolve(track)).isEqualTo(expected)
     }
+
+    @Test fun pendingProgressSurvivesCleanupWhileOrphansAndCorruptMetadataAreDiscarded() {
+        val directory = temporary.newFolder()
+        val store = OfflineAudioStore(directory)
+        store.recordPending(track)
+        val partial = store.partialFile(track.sourceIdentity)
+        partial.writeText("saved prefix")
+        val checkpoint = File("${partial.path}.resume")
+        checkpoint.writeText("validator fixture")
+        File(directory, "orphan.part").writeText("orphan")
+        File(directory, "bad.pending").writeText("{invalid")
+        store.cleanInterruptedFiles()
+        assertThat(partial.readText()).isEqualTo("saved prefix")
+        assertThat(checkpoint.exists()).isTrue()
+        assertThat(store.readPending()).containsExactly(track)
+        assertThat(File(directory, "orphan.part").exists()).isFalse()
+        assertThat(File(directory, "bad.pending").exists()).isFalse()
+        assertThat(store.find(track)).isNull()
+        store.commit(track, partial, "audio/mp4")
+        assertThat(store.readPending()).isEmpty()
+        assertThat(checkpoint.exists()).isFalse()
+    }
+
+    @Test fun savedSourceIsSharedAcrossPlaylistRecordsButDifferentUploadsStayDistinct() = runBlocking {
+        val store = OfflineAudioStore(temporary.newFolder())
+        val partial = store.partialFile(track.sourceIdentity)
+        partial.writeText("audio bytes")
+        store.commit(track, partial, "audio/mp4")
+        var networkCalls = 0
+        val resolver = OfflineFirstAudioResolver(store, object : AudioResolver {
+            override suspend fun resolve(track: Track): PlayableAudio {
+                networkCalls++
+                return PlayableAudio("https://example.com/other-upload")
+            }
+        })
+        val firstPlaylistTrack = track.copy(id = 10, title = "Title in playlist one")
+        val secondPlaylistTrack = track.copy(id = 27, title = "Title in playlist two")
+        assertThat(resolver.resolve(firstPlaylistTrack).uri).isEqualTo(resolver.resolve(secondPlaylistTrack).uri)
+        assertThat(networkCalls).isEqualTo(0)
+        resolver.resolve(track.copy(sourceMediaId = "different-upload"))
+        assertThat(networkCalls).isEqualTo(1)
+    }
 }

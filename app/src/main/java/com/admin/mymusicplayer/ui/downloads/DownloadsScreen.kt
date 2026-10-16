@@ -46,13 +46,13 @@ fun DownloadsScreen(
     Column(Modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         OutlinedButton(onClick = onBack) { Text("Back") }
         Text("Downloads", style = MaterialTheme.typography.headlineMedium)
-        Text("Keep the app open until downloads finish. Interrupted downloads can be retried. Saved audio plays offline and is kept until you remove it.")
+        Text("Keep the app open until downloads finish. Connection interruptions retry automatically and keep your progress. Paused downloads can be resumed. Saved audio plays offline in every playlist containing the same track.")
         current?.let { track ->
             val existing = downloads.firstOrNull { it.track.sourceIdentity == track.sourceIdentity }
             Button(
                 onClick = { repository.download(track) },
-                enabled = existing == null || existing.status == DownloadStatus.FAILED,
-            ) { Text("Download current audio") }
+                enabled = existing == null || existing.status == DownloadStatus.FAILED || existing.status == DownloadStatus.PAUSED,
+            ) { Text(if (existing?.status == DownloadStatus.PAUSED) "Resume current download" else "Download current audio") }
             Text(track.title, style = MaterialTheme.typography.bodyMedium)
         } ?: Text("Select a track in Search or a playlist, then return here to download it.")
         storageError?.let { Text(it, color = MaterialTheme.colorScheme.error) }
@@ -64,7 +64,7 @@ fun DownloadsScreen(
                     Text(item.track.title, style = MaterialTheme.typography.titleMedium)
                     item.track.uploader?.let { Text(it) }
                     when (item.status) {
-                        DownloadStatus.DOWNLOADING -> {
+                        DownloadStatus.DOWNLOADING, DownloadStatus.RETRYING -> {
                             val total = item.totalBytes
                             if (total != null && total > 0) {
                                 LinearProgressIndicator(
@@ -72,8 +72,11 @@ fun DownloadsScreen(
                                     modifier = Modifier.fillMaxWidth(),
                                 )
                             } else LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
-                            Text("Downloading · ${formatBytes(item.bytes)}")
+                            Text(if (item.status == DownloadStatus.RETRYING) {
+                                "${item.error} · ${formatBytes(item.bytes)} saved"
+                            } else "Downloading · ${formatBytes(item.bytes)}")
                         }
+                        DownloadStatus.PAUSED -> Text("${item.error} · ${formatBytes(item.bytes)} saved")
                         DownloadStatus.SAVED -> Text("Available offline · ${formatBytes(item.bytes)}")
                         DownloadStatus.FAILED -> Text(item.error.orEmpty(), color = MaterialTheme.colorScheme.error)
                     }
@@ -87,18 +90,20 @@ fun DownloadsScreen(
                                 }
                             }) { Text("Play") }
                         }
-                        if (item.status == DownloadStatus.FAILED) {
-                            Button(onClick = { repository.download(item.track) }) { Text("Retry") }
+                        if (item.status == DownloadStatus.FAILED || item.status == DownloadStatus.PAUSED) {
+                            Button(onClick = { repository.download(item.track) }) {
+                                Text(if (item.status == DownloadStatus.PAUSED) "Resume" else "Retry")
+                            }
                         }
                         OutlinedButton(onClick = { repository.remove(item.track.sourceIdentity) }) {
-                            Text(if (item.status == DownloadStatus.DOWNLOADING) "Cancel" else "Remove download")
+                            Text(if (item.status in setOf(DownloadStatus.DOWNLOADING, DownloadStatus.RETRYING)) "Cancel" else "Remove download")
                         }
                     }
                     HorizontalDivider()
                 }
             }
         }
-        Text("Downloads use app storage and are excluded from library backups. Uninstalling removes them.", style = MaterialTheme.typography.bodySmall)
+        Text("Some sources may require restarting. Downloads use app storage, are excluded from library backups, and are removed on uninstall.", style = MaterialTheme.typography.bodySmall)
     }
 }
 

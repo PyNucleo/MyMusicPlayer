@@ -26,9 +26,11 @@ The v0.1 implementation is complete as a local release candidate, but it is not 
 
 ## Offline audio (requested school-assignment feature)
 
-Select a track in Search or a playlist, then open **Now Playing → Downloads / Save audio → Download current audio**. Keep the app open until it shows **Available offline**. The Downloads screen provides Play, progress, Cancel, Retry, and Remove download.
+Select a track in Search or a playlist, then open **Now Playing → Downloads / Save audio → Download current audio**. Keep the app open until it shows **Available offline**. The Downloads screen provides Play, progress, Cancel, Resume/Retry, and Remove download.
 
-Completed audio is stored privately on the device and is preferred automatically during normal playback, including playlist/queue playback. It survives app restarts and clearing the temporary playback cache. Downloads are excluded from portable library backups and are removed on uninstall. Transfers are limited to 512 MiB per file and ten minutes; interrupted transfers restart on explicit retry. Source restrictions stop a download without a bypass.
+Completed audio is stored privately on the device and is preferred automatically in every playlist and queue containing that exact source track. Different uploads of the same song remain separate. Saved audio survives app restarts and clearing the temporary playback cache. Downloads are excluded from portable library backups and are removed on uninstall.
+
+Connection failures keep downloaded bytes and retry automatically up to five times with increasing delays. Longer interruptions pause the download with a Resume button. Pending downloads and their progress survive app restarts. Resume uses a fresh source URL when necessary and validated byte ranges; sources that change the audio, lack safe resume support, or ignore range requests restart safely. Transfers are limited to 512 MiB per file and ten minutes per attempt. Restrictions stop immediately without automatic retries or a bypass; cancelling/removing a download deletes its pending progress.
 
 This is a user-requested exception to the roadmap's deferred offline-library scope; other deferred features remain out of scope.
 

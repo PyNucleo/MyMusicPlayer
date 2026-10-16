@@ -11,6 +11,7 @@ import com.google.common.truth.Truth.assertThat
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.advanceUntilIdle
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import org.junit.Rule
 import org.junit.Test
@@ -51,7 +52,7 @@ class DownloadRepositoryTest {
         restored.close()
     }
 
-    @Test fun failedTransferCleansPartialAndCanRetry() = runTest {
+    @Test fun failedTransferKeepsPartialAndCanRetry() = runTest {
         val store = OfflineAudioStore(temporary.newFolder())
         var fail = true
         val repository = DownloadRepository(store, resolver, AudioDownloader { _, file, _ ->
@@ -63,11 +64,115 @@ class DownloadRepositoryTest {
         assertThat(repository.downloads.value.single().status).isEqualTo(DownloadStatus.FAILED)
         assertThat(repository.downloads.value.single().error).doesNotContain("secret")
         assertThat(store.find(track)).isNull()
-        assertThat(store.partialFile(track.sourceIdentity).exists()).isFalse()
+        assertThat(store.partialFile(track.sourceIdentity).readText()).isEqualTo("bytes")
+        assertThat(store.readPending()).containsExactly(track)
         fail = false
         repository.download(track)
         advanceUntilIdle()
         assertThat(repository.downloads.value.single().status).isEqualTo(DownloadStatus.SAVED)
+        repository.close()
+    }
+
+    @Test fun transientFailureRetriesAutomaticallyWithoutDiscardingProgress() = runTest {
+        val store = OfflineAudioStore(temporary.newFolder())
+        var calls = 0
+        val repository = DownloadRepository(store, resolver, AudioDownloader { _, file, progress ->
+            if (++calls == 1) {
+                file.writeText("hello")
+                progress(5, 10)
+                throw DownloadTransferException(true, "Disconnected")
+            }
+            assertThat(file.readText()).isEqualTo("hello")
+            file.appendText("world")
+            progress(10, 10)
+        }, main.dispatcher)
+        repository.download(track)
+        runCurrent()
+        assertThat(repository.downloads.value.single().status).isEqualTo(DownloadStatus.RETRYING)
+        assertThat(repository.downloads.value.single().bytes).isEqualTo(5L)
+        assertThat(calls).isEqualTo(1)
+        advanceUntilIdle()
+        assertThat(repository.downloads.value.single().status).isEqualTo(DownloadStatus.SAVED)
+        assertThat(calls).isEqualTo(2)
+        assertThat(store.readPending()).isEmpty()
+        repository.close()
+    }
+
+    @Test fun repeatedNetworkFailurePausesAfterFiniteRetriesAndRetainsBytes() = runTest {
+        val store = OfflineAudioStore(temporary.newFolder())
+        var calls = 0
+        val repository = DownloadRepository(store, resolver, AudioDownloader { _, file, _ ->
+            calls++
+            if (!file.exists()) file.writeText("saved prefix")
+            throw DownloadTransferException(true, "No network")
+        }, main.dispatcher)
+        repository.download(track)
+        advanceUntilIdle()
+        assertThat(calls).isEqualTo(6)
+        assertThat(repository.downloads.value.single().status).isEqualTo(DownloadStatus.PAUSED)
+        assertThat(repository.downloads.value.single().bytes).isEqualTo(12L)
+        assertThat(store.partialFile(track.sourceIdentity).readText()).isEqualTo("saved prefix")
+        assertThat(store.find(track)).isNull()
+        repository.close()
+    }
+
+    @Test fun pendingDownloadSurvivesRepositoryRecreationAndResumesFromItsPrefix() = runTest {
+        val store = OfflineAudioStore(temporary.newFolder())
+        val gate = CompletableDeferred<Unit>()
+        val original = DownloadRepository(store, resolver, AudioDownloader { _, file, _ ->
+            file.writeText("hello")
+            gate.await()
+        }, main.dispatcher)
+        original.download(track)
+        runCurrent()
+        original.close()
+        advanceUntilIdle()
+        val restored = DownloadRepository(OfflineAudioStore(store.partialFile(track.sourceIdentity).parentFile!!), resolver,
+            AudioDownloader { _, file, progress ->
+                assertThat(file.readText()).isEqualTo("hello")
+                file.appendText("world")
+                progress(10, 10)
+            }, main.dispatcher)
+        runCurrent()
+        assertThat(restored.downloads.value.single().status).isEqualTo(DownloadStatus.PAUSED)
+        assertThat(restored.downloads.value.single().bytes).isEqualTo(5L)
+        restored.download(track)
+        advanceUntilIdle()
+        assertThat(restored.downloads.value.single().status).isEqualTo(DownloadStatus.SAVED)
+        assertThat(store.readAll().single().bytes).isEqualTo(10L)
+        restored.close()
+    }
+
+    @Test fun cancellingDuringBackoffRemovesProgressAndPreventsLateRetry() = runTest {
+        val store = OfflineAudioStore(temporary.newFolder())
+        var calls = 0
+        val repository = DownloadRepository(store, resolver, AudioDownloader { _, file, _ ->
+            calls++
+            file.writeText("partial")
+            throw DownloadTransferException(true, "Disconnected")
+        }, main.dispatcher)
+        repository.download(track)
+        runCurrent()
+        repository.remove(track.sourceIdentity)
+        advanceUntilIdle()
+        assertThat(calls).isEqualTo(1)
+        assertThat(repository.downloads.value).isEmpty()
+        assertThat(store.readPending()).isEmpty()
+        assertThat(store.partialFile(track.sourceIdentity).exists()).isFalse()
+        repository.close()
+    }
+
+    @Test fun storageErrorsAreNotRetriedAsNetworkFailures() = runTest {
+        val store = OfflineAudioStore(temporary.newFolder())
+        var calls = 0
+        val repository = DownloadRepository(store, resolver, AudioDownloader { _, _, _ ->
+            calls++
+            throw DownloadTransferException(false, "Storage full")
+        }, main.dispatcher)
+        repository.download(track)
+        advanceUntilIdle()
+        assertThat(calls).isEqualTo(1)
+        assertThat(repository.downloads.value.single().status).isEqualTo(DownloadStatus.FAILED)
         repository.close()
     }
 
