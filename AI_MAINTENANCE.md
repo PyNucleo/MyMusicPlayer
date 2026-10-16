@@ -31,6 +31,13 @@ Machine-oriented implementation truth. Read `PROJECT_CONTEXT_AND_ROADMAP.md` and
 
 - The user explicitly requested updating GitHub and publishing the offline-audio debug APK for phone download. GitHub reports the repository is public; historical notes calling it private are obsolete. Keep existing releases, app ID, signing identity, version, and data formats unchanged. Publish a device-test prerelease, not v0.1.0; final signed-release and physical-device gates remain open.
 
+## Published offline-audio device build — 2026-10-17
+
+- Source was committed and pushed at `b8226773fc7f710456de05cf75c078b9975acbec`, then `assembleDebug --offline` succeeded from a clean worktree. The APK embeds `b8226773fc7f`; the existing debug signing certificate SHA-256 remains `eda803ed2ba15671a64cd6808c671625debd5c1096ac8143ec762c44b067ad6f`.
+- Public GitHub prerelease: `https://github.com/PyNucleo/MyMusicPlayer/releases/tag/device-test-0.1.0-offline-audio-b822677`. Its tag resolves exactly to the source commit above. It contains exactly one uploaded `app-debug.apk` asset, 19,047,389 bytes, with SHA-256 `8ACA64E3A47C556D158BFD6CC2748917B8C6575607E82128AB9EA1937910481D`.
+- Direct phone link: `https://github.com/PyNucleo/MyMusicPlayer/releases/download/device-test-0.1.0-offline-audio-b822677/app-debug.apk`. An independent unauthenticated download succeeded and matched both the local APK and GitHub's digest. No Google Drive or GitHub sign-in is needed for this public asset.
+- Earlier full regression for this source passed 54 tests with 1 guarded live canary skipped, Android test compilation, lint, and debug packaging. The post-commit rebuild changed build provenance only. This remains a device-test prerelease; physical-device/signed-release acceptance is pending. Existing releases, version, app identity, data formats, and repository visibility were preserved.
+
 ## Toolchain and pinned dependencies
 
 - JDK `17`; Android Gradle Plugin `9.2.1`; Gradle wrapper `9.4.1`.
