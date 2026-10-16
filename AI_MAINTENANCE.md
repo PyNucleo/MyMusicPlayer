@@ -47,6 +47,12 @@ Machine-oriented implementation truth. Read `PROJECT_CONTEXT_AND_ROADMAP.md` and
 - A completed download remains global to exact source identity, independent of playlist name, entry, database Track ID, or title. All playlists and queues containing the same upload use that offline file automatically. Another upload of the same song remains a separate identity.
 - Room schema 2, backup format 1, app ID, signing, version, dependencies, queue/shuffle/repeat, and extractor boundaries remain unchanged. Verification passes: 24/24 download tests; full `testDebugUnitTest lintDebug compileDebugAndroidTestKotlin assembleDebug` succeeds with 69 tests discovered, 68 passed, 1 guarded canary skipped, 0 failures/errors, and 0 lint errors (18 dependency/tool update notices only). Physical-device interruption/resume acceptance remains pending. Rebuild the GitHub APK from committed, clean source before publishing.
 
+## Published resume device build — 2026-10-17
+
+- Resume/retry code is committed at `13827f8396ce71d894b2933d1c88a40a7a296fc1`. The post-commit clean `assembleDebug --offline` passed, and the APK embeds `13827f8396ce` with the unchanged debug signing certificate. Packaged DEX strings were checked for the resume headers, PAUSED diagnostic state, pending metadata, and Resume UI.
+- Public prerelease: `https://github.com/PyNucleo/MyMusicPlayer/releases/tag/device-test-0.1.0-resume-downloads-13827f8`. Its tag resolves exactly to that source commit. The single `app-debug.apk` is 19,047,389 bytes with SHA-256 `41E79E3F4218E25EC47082813CC2F8D465BDF7B903476F41F4503586167E037F`; an independent unauthenticated download matches the local file and GitHub digest.
+- Phone link: `https://github.com/PyNucleo/MyMusicPlayer/releases/download/device-test-0.1.0-resume-downloads-13827f8/app-debug.apk`. Install/update over the prior debug app. Existing releases remain available. Host verification is 68 passed / 1 guarded canary skipped, 24 download tests, lint and Android test compilation passed; physical-device resume acceptance remains pending.
+
 ## Toolchain and pinned dependencies
 
 - JDK `17`; Android Gradle Plugin `9.2.1`; Gradle wrapper `9.4.1`.
