@@ -21,7 +21,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.admin.mymusicplayer.domain.RepeatMode
 
 @Composable
-fun PlayerScreen(viewModel: PlayerViewModel = viewModel()) {
+fun PlayerScreen(viewModel: PlayerViewModel = viewModel(), onDownloads: () -> Unit = {}) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     Column(
         Modifier.fillMaxSize().padding(24.dp),
@@ -67,7 +67,9 @@ fun PlayerScreen(viewModel: PlayerViewModel = viewModel()) {
                 )
             }
         }
-        Text("Native background playback", modifier = Modifier.padding(top = 24.dp))
+        OutlinedButton(onClick = onDownloads, modifier = Modifier.padding(top = 16.dp)) {
+            Text("Downloads / Save audio")
+        }
     }
 }
 

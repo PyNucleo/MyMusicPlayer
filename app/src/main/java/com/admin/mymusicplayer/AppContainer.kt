@@ -18,6 +18,10 @@ import com.admin.mymusicplayer.source.newpipe.NewPipeAudioResolver
 import com.admin.mymusicplayer.source.newpipe.NewPipeRuntime
 import com.admin.mymusicplayer.source.newpipe.NewPipeSearchProvider
 import com.admin.mymusicplayer.source.newpipe.NewPipePlaylistImporter
+import com.admin.mymusicplayer.downloads.DownloadRepository
+import com.admin.mymusicplayer.downloads.OfflineAudioStore
+import com.admin.mymusicplayer.downloads.OfflineFirstAudioResolver
+import java.io.File
 
 class AppContainer(context: Context) {
     val database: MusicDatabase = Room.databaseBuilder(
@@ -32,7 +36,10 @@ class AppContainer(context: Context) {
     private val newPipeRuntime = NewPipeRuntime()
     val searchProvider: SearchProvider = NewPipeSearchProvider(newPipeRuntime, diagnostics)
     val playlistImporter: PlaylistImporter = NewPipePlaylistImporter(newPipeRuntime, diagnostics)
-    val audioResolver: AudioResolver = NewPipeAudioResolver(newPipeRuntime, diagnostics)
+    private val networkAudioResolver: AudioResolver = NewPipeAudioResolver(newPipeRuntime, diagnostics)
+    val offlineAudioStore = OfflineAudioStore(File(context.filesDir, "offline-audio"))
+    val downloads = DownloadRepository(offlineAudioStore, networkAudioResolver, diagnostics = diagnostics)
+    val audioResolver: AudioResolver = OfflineFirstAudioResolver(offlineAudioStore, networkAudioResolver)
     val playbackClient: PlaybackClient by lazy { PlaybackClient(context.applicationContext, sessionRepository) }
     val backupManager = BackupManager(
         context.applicationContext,

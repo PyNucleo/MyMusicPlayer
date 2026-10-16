@@ -33,7 +33,9 @@ class AppLaunchTest {
         composeRule.onNodeWithText("Upcoming").assertIsDisplayed()
 
         composeRule.onNode(hasText("Now Playing") and hasClickAction(), useUnmergedTree = true).performClick()
-        composeRule.onNodeWithText("Native background playback").assertIsDisplayed()
+        composeRule.onNodeWithText("Downloads / Save audio").assertIsDisplayed().performClick()
+        composeRule.onNodeWithText("Downloads").assertIsDisplayed()
+        composeRule.onNodeWithText("Back").performClick()
 
         composeRule.onNode(hasText("Settings") and hasClickAction(), useUnmergedTree = true).performClick()
         composeRule.onNodeWithText("Library safety").assertIsDisplayed()

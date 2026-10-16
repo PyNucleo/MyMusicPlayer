@@ -38,6 +38,7 @@ import com.admin.mymusicplayer.ui.search.SearchScreen
 import com.admin.mymusicplayer.ui.search.SearchViewModel
 import com.admin.mymusicplayer.ui.settings.SettingsScreen
 import com.admin.mymusicplayer.ui.settings.SettingsViewModel
+import com.admin.mymusicplayer.ui.downloads.DownloadsScreen
 
 private data class Destination(val route: String, val label: String)
 
@@ -143,7 +144,15 @@ fun MusicPlayerApp() {
                             val factory = remember(playbackClient) {
                                 viewModelFactory { initializer { PlayerViewModel(playbackClient) } }
                             }
-                            PlayerScreen(viewModel(factory = factory))
+                            PlayerScreen(viewModel(factory = factory), onDownloads = { navController.navigate("downloads") })
+                        }
+                        composable("downloads") {
+                            DownloadsScreen(
+                                application.container.downloads,
+                                sessionRepository,
+                                playbackClient,
+                                onBack = { navController.popBackStack() },
+                            )
                         }
                         composable("settings") {
                             val backupManager = application.container.backupManager

@@ -11,6 +11,7 @@ import androidx.media3.common.Player
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.database.StandaloneDatabaseProvider
 import androidx.media3.datasource.DataSpec
+import androidx.media3.datasource.DefaultDataSource
 import androidx.media3.datasource.ResolvingDataSource
 import androidx.media3.datasource.cache.CacheDataSource
 import androidx.media3.datasource.cache.LeastRecentlyUsedCacheEvictor
@@ -27,6 +28,7 @@ import com.admin.mymusicplayer.domain.RepeatMode
 import com.admin.mymusicplayer.domain.Track
 import com.admin.mymusicplayer.resolver.AudioResolver
 import com.admin.mymusicplayer.resolver.PlayableAudio
+import com.admin.mymusicplayer.downloads.OfflineAudioStore
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -48,6 +50,7 @@ class PlaybackService : MediaSessionService() {
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private lateinit var repository: SessionRepository
     private lateinit var audioResolver: AudioResolver
+    private lateinit var offlineAudioStore: OfflineAudioStore
     private lateinit var player: ExoPlayer
     private lateinit var mediaSession: MediaSession
     private lateinit var cache: SimpleCache
@@ -66,6 +69,7 @@ class PlaybackService : MediaSessionService() {
         val container = (application as MusicPlayerApplication).container
         repository = container.sessionRepository
         audioResolver = container.audioResolver
+        offlineAudioStore = container.offlineAudioStore
         cache = SimpleCache(
             File(cacheDir, PLAYBACK_CACHE_DIRECTORY),
             LeastRecentlyUsedCacheEvictor(MAX_CACHE_BYTES),
@@ -76,7 +80,8 @@ class PlaybackService : MediaSessionService() {
             .setCache(cache)
             .setUpstreamDataSourceFactory(upstream)
             .setFlags(CacheDataSource.FLAG_IGNORE_CACHE_ON_ERROR)
-        val resolving = ResolvingDataSource.Factory(cached, ::resolveDataSpec)
+        // Local files bypass the evictable network cache and never open an HTTP data source.
+        val resolving = ResolvingDataSource.Factory(DefaultDataSource.Factory(this, cached), ::resolveDataSpec)
         player = ExoPlayer.Builder(this)
             .setMediaSourceFactory(DefaultMediaSourceFactory(resolving))
             .setAudioAttributes(
@@ -190,8 +195,12 @@ class PlaybackService : MediaSessionService() {
             ?: throw IOException("Invalid queue media URI")
         val track = tracksByQueueEntryId[queueEntryId]
             ?: throw IOException("Queue entry is no longer available")
+        offlineAudioStore.find(track)?.let { offline ->
+            return dataSpec.buildUpon().setUri(offline.uri.toUri()).setKey(track.cacheKey).build()
+        }
         val cachedResolution = resolvedAudio[queueEntryId]?.takeUnless { playable ->
-            playable.expiresAtEpochMs?.let { it <= System.currentTimeMillis() + URL_EXPIRY_MARGIN_MS } == true
+            playable.uri.startsWith("file:") ||
+                playable.expiresAtEpochMs?.let { it <= System.currentTimeMillis() + URL_EXPIRY_MARGIN_MS } == true
         }
         val playable = cachedResolution ?: runBlocking(Dispatchers.IO) {
             withTimeout(RESOLVE_TIMEOUT_MS) { audioResolver.resolve(track) }

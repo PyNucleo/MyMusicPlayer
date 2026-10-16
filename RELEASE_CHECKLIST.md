@@ -8,13 +8,13 @@ Recorded 2026-08-19. A checked item has direct local evidence. Device/source/sig
 
 - [x] Permanent application ID is `com.admin.mymusicplayer`.
 - [x] Roadmap/source-of-truth files exist and the copied roadmap SHA-256 matches `304FD58BF93FE7DF57FCD09C0BE5123DB5BD374455FABEB8CCB4B942A8F97584`.
-- [x] `testDebugUnitTest`: 45 discovered, 44 passed, 0 failed/errors, one intentionally skipped live canary.
+- [x] `testDebugUnitTest`: 55 discovered, 54 passed, 0 failed/errors, one intentionally skipped live canary (includes 10 download/offline tests).
 - [x] Shuffle permutation, actual-consumption eligibility, exact Song-2-of-3 selection regression, Previous behavior, process-recreation, reshuffle, and cross-cycle boundary tests pass.
 - [x] Repeat Once/Forever/manual-navigation policy and player reducer tests pass.
 - [x] Room exact-source duplicate, ordering, transactional copy/move/remove/reorder, Undo, queue separation, consumed-history recreation, corrupt-transient-state isolation, and schema `1 → 2` entity/relationship/session migration tests pass.
 - [x] Backup validation and transactional export/restore tests pass.
 - [x] Search latest-request-wins and finite failure/retry tests pass.
-- [x] Latest offline `lintDebug`: 0 issues; an earlier network-aware run reported nine pinned-dependency/tool update notices only.
+- [x] `lintDebug`: 0 errors; the offline baseline had 0 issues, and the latest network-aware run reports 18 pinned-dependency/tool update notices only.
 - [x] `compileDebugAndroidTestKotlin`: Room schema-2 migration validation and Compose launch/navigation tests compile.
 - [x] `assembleDebug`: debug APK produced.
 - [x] `assembleRelease`: unsigned release APK produced when signing environment is absent.
@@ -65,6 +65,9 @@ Required tests:
 - [ ] Audio focus loss/ducking and becoming-noisy unplug/disconnect behavior work without speaker blast.
 - [ ] Force-stop/process-death scenario restores coherent queue/current index/position/shuffle/repeat as Android permits.
 - [ ] Clearing playback cache does not damage library/session and playback re-resolves safely.
+- [ ] Download audio, enable airplane mode, restart the app, and verify Downloads Play plus normal playlist/queue playback and seeking.
+- [ ] Clear playback cache while offline; completed downloads still play. Remove a download; playlists and queue remain intact.
+- [ ] Cancel/interruption, retry, network loss, full storage, and source restrictions leave no playable partial download or indefinite spinner.
 - [ ] Source/network failure remains finite and library stays available offline.
 - [ ] Manual backup, library mutation, previewed validated restore, and exact order recovery work.
 - [ ] Automatic backup location permission survives restart and rolling retention remains about ten files.

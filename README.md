@@ -24,6 +24,14 @@ The v0.1 implementation is complete as a local release candidate, but it is not 
 - Versioned JSON backup/validated transactional restore through Android's Storage Access Framework, optional rolling automatic backups, and cache clearing.
 - Bounded local-only diagnostics with an exportable build/device/dependency/event bundle.
 
+## Offline audio (requested school-assignment feature)
+
+Select a track in Search or a playlist, then open **Now Playing → Downloads / Save audio → Download current audio**. Keep the app open until it shows **Available offline**. The Downloads screen provides Play, progress, Cancel, Retry, and Remove download.
+
+Completed audio is stored privately on the device and is preferred automatically during normal playback, including playlist/queue playback. It survives app restarts and clearing the temporary playback cache. Downloads are excluded from portable library backups and are removed on uninstall. Transfers are limited to 512 MiB per file and ten minutes; interrupted transfers restart on explicit retry. Source restrictions stop a download without a bypass.
+
+This is a user-requested exception to the roadmap's deferred offline-library scope; other deferred features remain out of scope.
+
 ## Toolchain
 
 - JDK 17
